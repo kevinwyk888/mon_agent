@@ -12,7 +12,7 @@ SWE-bench style runs. It adds:
 
 - `src/mon_agent/`: main implementation
 - `configs/`: experiment config and LiteLLM model registry
-- `scripts/`: SLURM and setup scripts used for deployment and evaluation
+- `scripts/`: public setup script plus generic run guidance
 - `feasible_method.md`: research notes for the monitoring approach
 - `results/visualize.py`: helper script for analyzing saved trajectories
 
@@ -88,19 +88,20 @@ The main CLI entrypoint is:
 mon-agent-runner --help
 ```
 
-The existing SLURM wrappers remain available under `scripts/`, for example:
+This repository intentionally does not publish the original cluster-specific
+SLURM launch scripts. Those internal scripts contained local account names,
+scratch paths, and site-specific infrastructure settings.
 
-```bash
-sbatch scripts/run_all_single_node.slurm
-```
+Instead, use the generic guidance in `scripts/README.md` and adapt it to your
+own cluster or local environment.
 
 ## Reproducibility note
 
-Several SLURM scripts contain cluster-specific values such as:
+The original experiments used cluster-specific values such as:
 
 - account names
 - scratch paths
 - GPU partition names
 
-These should be treated as local infrastructure settings and may need edits on a
-different cluster.
+These should be treated as local infrastructure settings and recreated locally
+for a different cluster.

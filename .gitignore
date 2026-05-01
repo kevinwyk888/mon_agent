@@ -16,6 +16,8 @@ results/*
 !results/.gitkeep
 !results/visualize.py
 
+scripts_private/
+
 slides/*.log
 slides/*.aux
 slides/*.nav
