@@ -16,12 +16,20 @@ SWE-bench style runs. It adds:
 - `feasible_method.md`: research notes for the monitoring approach
 - `results/visualize.py`: helper script for analyzing saved trajectories
 
-## Important dependency
+## Dependency model
 
-This project is not fully standalone. It depends on a sibling checkout of
-`mini-SWE-agent` and imports `minisweagent` directly.
+`mon-agent` imports `minisweagent` directly. It therefore depends on
+`mini-SWE-agent`.
 
-The current setup script expects this directory layout:
+- Default install path:
+  `pyproject.toml` pins `mini-SWE-agent` to commit
+  `ed58678c7e4670e1ffcbac35e90ca6ac8a5ddf7c`, so `pip install -e .` works even
+  without a local sibling checkout.
+- Local development path:
+  if you already have a sibling `mini-SWE-agent/` checkout, the setup script
+  will install that editable copy instead.
+
+The local development layout is:
 
 ```text
 Agent/
@@ -31,11 +39,59 @@ Agent/
 
 ## Quick setup
 
+### Option 1: simplest path
+
+Clone only `mon-agent` and let pip install the pinned upstream dependency:
+
 ```bash
-cd /path/to/Agent/mon-agent
+git clone <your-mon-agent-repo-url>
+cd mon-agent
+python3 -m venv ~/.venvs/mon_agent_env
+source ~/.venvs/mon_agent_env/bin/activate
+python -m pip install --upgrade pip
+python -m pip install -e ".[vllm]"
+mon-agent-runner --help
+```
+
+### Option 2: develop against a local mini-SWE-agent checkout
+
+Use this if you also want to inspect or modify the upstream agent code:
+
+```bash
+git clone <your-mon-agent-repo-url>
+git clone https://github.com/SWE-agent/mini-SWE-agent
+cd mini-SWE-agent
+git checkout ed58678c7e4670e1ffcbac35e90ca6ac8a5ddf7c
+
+cd ../mon-agent
 bash scripts/setup_env.sh
 source ~/.venvs/mon_agent_env/bin/activate
-export PYTHONPATH="$PWD/src:${PYTHONPATH:-}"
+mon-agent-runner --help
+```
+
+### Import check
+
+```bash
+python - <<'PY'
+import mon_agent.agent
+import mon_agent.runner
+import mon_agent.prefix
+print("imports_ok")
+PY
+```
+
+## Running the code
+
+The main CLI entrypoint is:
+
+```bash
+mon-agent-runner --help
+```
+
+The existing SLURM wrappers remain available under `scripts/`, for example:
+
+```bash
+sbatch scripts/run_all_single_node.slurm
 ```
 
 ## Reproducibility note
