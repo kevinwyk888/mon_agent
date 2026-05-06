@@ -170,9 +170,9 @@ model:
 
     If you have completed your assignment, please consult the first message about how to
     submit your solution (you will not be able to continue working on this task after that).
-  model_name: "hosted_vllm/google/gemma-4-31B-it"
+  model_name: "openai/deepseek-chat"
   model_kwargs:
-    api_base: "http://localhost:8000/v1"
+    api_base: "https://api.deepseek.com"
     drop_params: true
     temperature: 0.0
     parallel_tool_calls: true
