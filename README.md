@@ -105,3 +105,13 @@ The original experiments used cluster-specific values such as:
 
 These should be treated as local infrastructure settings and recreated locally
 for a different cluster.
+
+### 
+
+``salloc --account=alkontar0 --partition=spgpu --gpus=1 --cpus-per-task=4 --mem=32G --time=01:00:00``
+
+``module load singularity``
+
+``source ~/.venvs/mon_agent_env/bin/activate``
+
+``bash scripts/run_mc_fork.sh``

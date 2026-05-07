@@ -51,9 +51,17 @@ def process_instance(
     instance_id = instance["instance_id"]
     instance_dir = output_dir / instance_id
 
-    # Clean stale state
+    # Clean stale state (trajectory + monitoring sidecars; the sidecars are
+    # written in append mode so leaving them around would mix runs).
     remove_from_preds_file(output_dir / "preds.json", instance_id)
-    (instance_dir / f"{instance_id}.traj.json").unlink(missing_ok=True)
+    for stale in (
+        f"{instance_id}.traj.json",
+        f"{instance_id}.steps.jsonl",
+        f"{instance_id}.mc.jsonl",
+        f"{instance_id}.traj.steps.jsonl",
+        f"{instance_id}.traj.mc.jsonl",
+    ):
+        (instance_dir / stale).unlink(missing_ok=True)
 
     model = get_model(config=config.get("model", {}))
     task = instance["problem_statement"]
@@ -79,6 +87,7 @@ def process_instance(
             model,
             env,
             task=task,
+            mc_config=config.get("mc_fork"),
             **agent_config,
         )
 
@@ -147,6 +156,42 @@ def main(
         [str(DEFAULT_CONFIG_FILE)], "-c", "--config"
     ),
     environment_class: str | None = typer.Option(None, "--environment-class"),
+    # ------------------------------------------------------------------
+    # Monte-Carlo prefix evaluation flags (Phase-2 of feasible_method.md)
+    # ------------------------------------------------------------------
+    mc_fork: bool = typer.Option(
+        False, "--mc-fork/--no-mc-fork",
+        help="Enable Monte-Carlo fork rollouts to estimate Y_k = P(success | prefix_k).",
+    ),
+    mc_fork_every: int = typer.Option(
+        5, "--mc-fork-every", help="Run MC every N main-trajectory steps."
+    ),
+    mc_samples: int = typer.Option(
+        4, "--mc-samples", help="Number of fork rollouts per snapshot (M)."
+    ),
+    mc_temperature: float = typer.Option(
+        0.7, "--mc-temperature", help="Sampling temperature inside forks."
+    ),
+    mc_top_p: float = typer.Option(
+        0.95, "--mc-top-p", help="top_p inside forks."
+    ),
+    mc_max_fork_steps: int = typer.Option(
+        20, "--mc-max-fork-steps", help="Static cap on fork steps (used when --mc-max-fork-steps-total <= 0)."
+    ),
+    mc_max_fork_steps_min: int = typer.Option(
+        0, "--mc-max-fork-steps-min",
+        help="Floor for the dynamic cap. Effective with --mc-max-fork-steps-total > 0.",
+    ),
+    mc_max_fork_steps_total: int = typer.Option(
+        0, "--mc-max-fork-steps-total",
+        help="If > 0, cap = max(--mc-max-fork-steps-min, total - current_step). Overrides --mc-max-fork-steps.",
+    ),
+    mc_fork_cost_budget: float = typer.Option(
+        1.0, "--mc-fork-cost-budget", help="Max additional $ cost per fork."
+    ),
+    mc_snapshot_cwd: str = typer.Option(
+        "/testbed", "--mc-snapshot-cwd", help="Container working dir to snapshot via git."
+    ),
 ) -> None:
     """Run mini-SWE-agent on SWE-bench with MonitoringAgent."""
     output_path = Path(output)
@@ -173,6 +218,18 @@ def main(
         {
             "environment": {"environment_class": environment_class or UNSET},
             "model": {"model_name": model or UNSET, "model_class": model_class or UNSET},
+            "mc_fork": {
+                "enabled": mc_fork,
+                "fork_every": mc_fork_every,
+                "samples": mc_samples,
+                "temperature": mc_temperature,
+                "top_p": mc_top_p,
+                "max_fork_steps": mc_max_fork_steps,
+                "max_fork_steps_min": mc_max_fork_steps_min,
+                "max_fork_steps_total": mc_max_fork_steps_total,
+                "fork_cost_budget": mc_fork_cost_budget,
+                "snapshot_cwd": mc_snapshot_cwd,
+            },
         }
     )
     config = recursive_merge(*configs)

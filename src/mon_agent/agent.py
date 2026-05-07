@@ -14,6 +14,7 @@ from minisweagent.agents.default import DefaultAgent
 from mon_agent.features.command_parser import classify_command, extract_target_file
 from mon_agent.features.repetition import repeat_cmd_score, repeat_file_score
 from mon_agent.features.signals import classify_obs_tag, compute_test_delta
+from mon_agent.mc_fork import MCForkConfig, estimate_y_mc
 from mon_agent.prefix import Prefix, build_prefix
 
 logger = logging.getLogger(__name__)
@@ -56,12 +57,26 @@ class MonitoringAgent(DefaultAgent):
     written alongside the normal trajectory file.
     """
 
-    def __init__(self, *args: Any, task: str = "", **kwargs: Any) -> None:
+    def __init__(
+        self,
+        *args: Any,
+        task: str = "",
+        mc_config: dict[str, Any] | MCForkConfig | None = None,
+        is_fork: bool = False,
+        **kwargs: Any,
+    ) -> None:
         super().__init__(*args, **kwargs)
         self.step_logs: list[dict[str, Any]] = []
         self._task_text: str = task
         self._failure_streak: int = 0
         self._last_test_output: str = ""
+        # Monte-Carlo fork settings (skip entirely when this agent IS itself a fork)
+        self._is_fork: bool = is_fork
+        if isinstance(mc_config, MCForkConfig):
+            self._mc_cfg: MCForkConfig = mc_config
+        else:
+            self._mc_cfg = MCForkConfig.from_dict(mc_config)
+        self.mc_results: list[dict[str, Any]] = []
 
     # ------------------------------------------------------------------
     # Core override
@@ -80,17 +95,68 @@ class MonitoringAgent(DefaultAgent):
         # Collect signals from messages appended by super().step()
         self._log_step(cost_before, n_calls_before, step_wall_s)
 
+        # Optionally run MC fork rollouts to estimate Y_k = P(success | prefix_k).
+        # Only on the main agent (forks set is_fork=True) and only every K steps.
+        self._maybe_run_mc()
+
         # Incrementally save step logs alongside the trajectory.
         # DefaultAgent.run() already saves the traj after each step via
         # output_path; here we also append the latest step record so that
         # data is never lost even if the job is killed.
-        if self.config.output_path:
-            step_log_path = Path(str(self.config.output_path)).with_suffix(".steps.jsonl")
+        if self.config.output_path and not self._is_fork:
+            step_log_path = self._sidecar_path(".steps.jsonl")
             step_log_path.parent.mkdir(parents=True, exist_ok=True)
             with open(step_log_path, "a") as f:
                 f.write(json.dumps(self.step_logs[-1]) + "\n")
 
         return result
+
+    def _sidecar_path(self, ext: str) -> Path:
+        """Return <instance_id><ext> next to output_path.
+
+        output_path is typically '<dir>/<inst>.traj.json' so we strip the
+        '.traj.json' suffix to avoid '.traj.steps.jsonl' / '.traj.mc.jsonl'.
+        """
+        out = Path(str(self.config.output_path))
+        name = out.name
+        for suffix in (".traj.json", ".json"):
+            if name.endswith(suffix):
+                name = name[: -len(suffix)]
+                break
+        return out.parent / f"{name}{ext}"
+
+    # ------------------------------------------------------------------
+    # Monte-Carlo prefix evaluation
+    # ------------------------------------------------------------------
+
+    def _maybe_run_mc(self) -> None:
+        cfg = self._mc_cfg
+        if self._is_fork or not cfg.enabled or cfg.samples <= 0 or cfg.fork_every <= 0:
+            return
+        if not self.step_logs:
+            return
+        # Don't fork after a step that already ended the run
+        if self.messages and self.messages[-1].get("role") == "exit":
+            return
+        if self.n_calls % cfg.fork_every != 0:
+            return
+
+        logger.info("Running MC fork rollouts at step %d (M=%d)", self.n_calls, cfg.samples)
+        mc = estimate_y_mc(self, cfg)
+        if mc is None:
+            return
+
+        record = mc.to_dict()
+        self.mc_results.append(record)
+        # attach y_mc to the latest step log so downstream code sees a single stream
+        self.step_logs[-1]["y_mc"] = record["y_mc"]
+        self.step_logs[-1]["y_mc_n_samples"] = record["n_samples"]
+
+        if self.config.output_path:
+            mc_path = self._sidecar_path(".mc.jsonl")
+            mc_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(mc_path, "a") as f:
+                f.write(json.dumps(record) + "\n")
 
     def execute_actions(self, message: dict) -> list[dict]:
         """Execute actions, blocking commands that would flood the context."""
@@ -273,6 +339,7 @@ class MonitoringAgent(DefaultAgent):
         data = super().serialize(*extra_dicts)
         data["step_logs"] = self.step_logs
         data["prefix_final"] = self.get_prefix().to_dict() if self.step_logs else None
+        data["mc_results"] = self.mc_results
         return data
 
     def save_step_logs(self, path: Path) -> None:
