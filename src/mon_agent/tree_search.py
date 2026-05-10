@@ -56,23 +56,21 @@ logger = logging.getLogger(__name__)
 # Branching factor is fixed: every internal node splits into exactly two children.
 _BRANCHING = 2
 
-# Per-child sampling temperatures (fixed by design). The last digit of node_id
-# selects which one applies: ".0" → left (deterministic), ".1" → right (diverse).
-# The root has no parent split and uses the left temperature.
-_TEMPERATURE_LEFT = 0.0
-_TEMPERATURE_RIGHT = 0.3
+# Per-child sampling temperatures are configurable via TreeSearchConfig.
+# The last digit of node_id selects which one applies: ".0" → left,
+# ".1" → right. The root has no parent split and uses the left temperature.
 _TOP_P = 1.0
 
 
-def _temperature_for(node_id: str) -> float:
-    """Return the fixed sampling temperature for a node.
+def _temperature_for(node_id: str, cfg: "TreeSearchConfig") -> float:
+    """Return the sampling temperature for a node based on ``cfg``.
 
     node_id is a dotted path like ``"0"``, ``"0.0"``, ``"0.1.0"``. The last
     component is the child index (0 = left, 1 = right). The root ``"0"`` is
-    treated as a left-style deterministic baseline.
+    treated as a left-style baseline.
     """
     last = node_id.rsplit(".", 1)[-1]
-    return _TEMPERATURE_RIGHT if last == "1" else _TEMPERATURE_LEFT
+    return cfg.temperature_right if last == "1" else cfg.temperature_left
 
 
 # ---------------------------------------------------------------------------
@@ -93,6 +91,10 @@ class TreeSearchConfig:
     """Max additional $ cost per child segment (between two splits)."""
     snapshot_cwd: str = "/testbed"
     seed_base: int = 1234
+    temperature_left: float = 0.2
+    """Sampling temperature for left ('.0') children and the root."""
+    temperature_right: float = 0.6
+    """Sampling temperature for right ('.1') children."""
 
     # ------------------------------------------------------------------
     # SWE-bench harness evaluation (real success signal for y at leaves)
@@ -419,7 +421,7 @@ def _expand_node(
     seed = cfg.seed_base + int.from_bytes(digest[:4], "big")
     fork_model = clone_model_with_sampling(
         template_agent.model,
-        temperature=_temperature_for(node_id),
+        temperature=_temperature_for(node_id, cfg),
         top_p=_TOP_P,
         seed=seed,
     )
@@ -457,7 +459,7 @@ def _expand_node(
         n_steps=max(0, seg.n_calls - parent_n_calls),
         cost=max(0.0, seg.cost - parent_cost),
         wall_s=round(time.monotonic() - t0, 2),
-        temperature=_temperature_for(node_id),
+        temperature=_temperature_for(node_id, cfg),
     )
 
     # ------------------------------------------------------------------

@@ -35,10 +35,10 @@
 #SBATCH --job-name=mon_tree
 #SBATCH --account=alkontar0
 #SBATCH --partition=spgpu
-#SBATCH --gpus=2
+#SBATCH --gpus=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=96G
-#SBATCH --time=10:00:00
+#SBATCH --time=12:00:00
 #SBATCH --output=logs/slurm-%j.out
 #SBATCH --error=logs/slurm-%j.err
 # #SBATCH --mail-type=BEGIN,END,FAIL
@@ -76,20 +76,37 @@ export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 # Heavy outputs go to scratch (~10TB). Per-instance CSVs land under
 # ${PWD}/results/${RUN_NAME}/ (handled by run_mc_fork.sh).
 export SCRATCH_BASE="${SCRATCH_BASE:-/scratch/alkontar_root/alkontar0/kevinwyk}"
+
+# Singularity sandbox build unpacks ~5-10 GB per image. /tmp on compute nodes
+# is small (~16 GB) and shared across workers — point all temp/cache dirs to
+# scratch (~10 TB) to avoid "No space left on device" during sandbox build.
+export TMPDIR="${TMPDIR:-${SCRATCH_BASE}/tmp}"
+export SINGULARITY_TMPDIR="${SINGULARITY_TMPDIR:-${SCRATCH_BASE}/sing_tmp}"
+export SINGULARITY_CACHEDIR="${SINGULARITY_CACHEDIR:-${SCRATCH_BASE}/singularity_home/cache}"
+mkdir -p "$TMPDIR" "$SINGULARITY_TMPDIR" "$SINGULARITY_CACHEDIR"
 export RUN_NAME="${RUN_NAME:-tree_run_${SLURM_JOB_ID:-local}}"
 export OUTPUT_DIR="${OUTPUT_DIR:-${SCRATCH_BASE}/mon_agent/${RUN_NAME}}"
 export CSV_OUT_DIR="${CSV_OUT_DIR:-${SLURM_SUBMIT_DIR:-$PWD}/results/${RUN_NAME}}"
 export CONFIG="${CONFIG:-configs/swebench_lite.yaml}"
 export SUBSET="${SUBSET:-lite}"
 export SPLIT="${SPLIT:-test}"
-export SLICE="${SLICE:-0:25}"
-export WORKERS="${WORKERS:-16}"
+export SLICE="${SLICE:-0:50}"
+# Override the model defined in CONFIG. Common values:
+#   openai/deepseek-v4-pro    (strong, default)
+#   openai/deepseek-v4-flash  (lightweight distilled, more diversity)
+export MODEL="${MODEL:-openai/deepseek-v4-flash}"
+# Default WORKERS=4: each worker may unpack a ~5-10 GB Singularity sandbox
+# concurrently; 16 workers easily exhaust /tmp and GPFS metadata. Override
+# only if SINGULARITY_TMPDIR is on a fast, large filesystem.
+export WORKERS="${WORKERS:-8}"
 export SIF_CACHE="${SIF_CACHE:-${SCRATCH_BASE}/swebench_sif}"
 
 export TREE_FORK_EVERY="${TREE_FORK_EVERY:-10}"
 export TREE_STEP_BUDGET="${TREE_STEP_BUDGET:-60}"
 export TREE_FORK_COST_BUDGET="${TREE_FORK_COST_BUDGET:-5.0}"
 export TREE_SNAPSHOT_CWD="${TREE_SNAPSHOT_CWD:-/testbed}"
+export TREE_TEMPERATURE_LEFT="${TREE_TEMPERATURE_LEFT:-0.3}"
+export TREE_TEMPERATURE_RIGHT="${TREE_TEMPERATURE_RIGHT:-0.8}"
 
 export EVAL_HARNESS="${EVAL_HARNESS:-1}"
 export EVAL_BACKEND="${EVAL_BACKEND:-singularity}"
@@ -100,12 +117,15 @@ cat <<EOF
   OUTPUT_DIR              = ${OUTPUT_DIR}
   CSV_OUT_DIR             = ${CSV_OUT_DIR}
   CONFIG                  = ${CONFIG}
+  MODEL                   = ${MODEL}
   SUBSET / SPLIT / SLICE  = ${SUBSET} / ${SPLIT} / ${SLICE}
   WORKERS                 = ${WORKERS}
   TREE_FORK_EVERY         = ${TREE_FORK_EVERY}
   TREE_STEP_BUDGET        = ${TREE_STEP_BUDGET}
   TREE_FORK_COST_BUDGET   = ${TREE_FORK_COST_BUDGET}
   TREE_SNAPSHOT_CWD       = ${TREE_SNAPSHOT_CWD}
+  TREE_TEMPERATURE_LEFT   = ${TREE_TEMPERATURE_LEFT}
+  TREE_TEMPERATURE_RIGHT  = ${TREE_TEMPERATURE_RIGHT}
   EVAL_HARNESS            = ${EVAL_HARNESS}
   EVAL_BACKEND            = ${EVAL_BACKEND}
   SIF_CACHE               = ${SIF_CACHE}

@@ -48,12 +48,18 @@ SPLIT="${SPLIT:-test}"
 SLICE="${SLICE:-0:25}"              # first 25 test-split instances by default
 WORKERS="${WORKERS:-4}"             # cross-instance concurrency
 SIF_CACHE="${SIF_CACHE:-${SCRATCH_BASE}/swebench_sif}"
+# Override CONFIG's model.model_name. Common values:
+#   openai/deepseek-v4-pro    (strong, default)
+#   openai/deepseek-v4-flash  (lightweight distilled, more diversity)
+MODEL="${MODEL:-openai/deepseek-v4-pro}"
 
 # Tree-search knobs
 TREE_FORK_EVERY="${TREE_FORK_EVERY:-5}"
 TREE_STEP_BUDGET="${TREE_STEP_BUDGET:-60}"
 TREE_FORK_COST_BUDGET="${TREE_FORK_COST_BUDGET:-5.0}"
 TREE_SNAPSHOT_CWD="${TREE_SNAPSHOT_CWD:-/testbed}"
+TREE_TEMPERATURE_LEFT="${TREE_TEMPERATURE_LEFT:-0.2}"
+TREE_TEMPERATURE_RIGHT="${TREE_TEMPERATURE_RIGHT:-0.6}"
 
 # Harness eval knobs
 EVAL_HARNESS="${EVAL_HARNESS:-1}"   # 1 = run real SWE-bench harness on each leaf
@@ -88,12 +94,15 @@ cat <<EOF
   OUTPUT_DIR              = ${OUTPUT_DIR}
   CSV_OUT_DIR             = ${CSV_OUT_DIR}
   CONFIG                  = ${CONFIG}
+  MODEL                   = ${MODEL}
   SUBSET / SPLIT / SLICE  = ${SUBSET} / ${SPLIT} / ${SLICE}
   WORKERS                 = ${WORKERS}
   TREE_FORK_EVERY         = ${TREE_FORK_EVERY}
   TREE_STEP_BUDGET        = ${TREE_STEP_BUDGET}
   TREE_FORK_COST_BUDGET   = ${TREE_FORK_COST_BUDGET}
   TREE_SNAPSHOT_CWD       = ${TREE_SNAPSHOT_CWD}
+  TREE_TEMPERATURE_LEFT   = ${TREE_TEMPERATURE_LEFT}
+  TREE_TEMPERATURE_RIGHT  = ${TREE_TEMPERATURE_RIGHT}
   EVAL_HARNESS            = ${EVAL_HARNESS}
   EVAL_BACKEND            = ${EVAL_BACKEND}
   SIF_CACHE               = ${SIF_CACHE}
@@ -104,6 +113,7 @@ EOF
 # --------------------------------------------------------------------------- #
 runner_args=(
   -c "${CONFIG}"
+  --model "${MODEL}"
   --subset "${SUBSET}"
   --split "${SPLIT}"
   --slice "${SLICE}"
@@ -115,6 +125,8 @@ runner_args=(
   --tree-step-budget "${TREE_STEP_BUDGET}"
   --tree-fork-cost-budget "${TREE_FORK_COST_BUDGET}"
   --tree-snapshot-cwd "${TREE_SNAPSHOT_CWD}"
+  --tree-temperature-left "${TREE_TEMPERATURE_LEFT}"
+  --tree-temperature-right "${TREE_TEMPERATURE_RIGHT}"
 )
 if [[ "${EVAL_HARNESS}" == "1" ]]; then
   runner_args+=(

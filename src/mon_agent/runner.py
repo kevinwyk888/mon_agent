@@ -248,6 +248,14 @@ def main(
     tree_fork_cost_budget: float = typer.Option(
         5.0, "--tree-fork-cost-budget", help="Max additional $ cost per child segment.",
     ),
+    tree_temperature_left: float = typer.Option(
+        0.2, "--tree-temperature-left",
+        help="Sampling temperature for left ('.0') children and the root.",
+    ),
+    tree_temperature_right: float = typer.Option(
+        0.6, "--tree-temperature-right",
+        help="Sampling temperature for right ('.1') children.",
+    ),
     tree_snapshot_cwd: str = typer.Option(
         "/testbed", "--tree-snapshot-cwd", help="Container working dir to snapshot via git.",
     ),
@@ -315,6 +323,8 @@ def main(
                 "step_budget": tree_step_budget,
                 "fork_cost_budget": tree_fork_cost_budget,
                 "snapshot_cwd": tree_snapshot_cwd,
+                "temperature_left": tree_temperature_left,
+                "temperature_right": tree_temperature_right,
                 "evaluate_with_harness": tree_eval_harness,
                 "harness_backend": tree_eval_backend,
                 "harness_sif_cache_dir": tree_eval_sif_cache,
