@@ -170,7 +170,11 @@ model:
 
     If you have completed your assignment, please consult the first message about how to
     submit your solution (you will not be able to continue working on this task after that).
-  model_name: "openai/deepseek-chat"
+  # NOTE: the public alias `deepseek-chat` silently routes to `deepseek-v4-flash`
+  # (lightweight distilled). Use `deepseek-v4-pro` for the main-line model.
+  # Run `curl https://api.deepseek.com/v1/models -H "Authorization: Bearer $KEY"`
+  # to see what your account can actually call.
+  model_name: "openai/deepseek-v4-pro"
   model_kwargs:
     api_base: "https://api.deepseek.com"
     drop_params: true

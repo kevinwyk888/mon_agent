@@ -1,76 +1,161 @@
 #!/usr/bin/env bash
-# Run mon-agent with Monte-Carlo prefix evaluation (Phase-2 of feasible_method.md).
+# Run mon-agent tree-search on SWE-bench + post-process to CSV.
 #
 # What this does
 # --------------
-# At every K main-trajectory steps the runner:
-#   1. snapshots /testbed via `git commit-tree` inside the Singularity sandbox,
-#   2. spawns M fork rollouts that share the env but use a higher-temperature
-#      copy of the model so they actually diverge,
-#   3. resets the env after each rollout (and again at the end),
-#   4. records Y_k^MC = (#successful forks) / M into:
-#        results/<run>/<instance_id>/<instance_id>.mc.jsonl
-#        results/<run>/<instance_id>/<instance_id>.steps.jsonl  (y_mc field)
-#        results/<run>/<instance_id>/<instance_id>.traj.json    (mc_results)
-#
-# Cost warning
-# ------------
-# A single instance with step_limit=60, --mc-fork-every 5, --mc-samples 4,
-# --mc-max-fork-steps 20 can multiply LLM calls by ~10-15x. Start small:
-# slice 1-2 instances and a low M before scaling up.
+# 1. Drives a binary-tree search (split every K steps, branching=2, fixed
+#    left-temp=0.0 / right-temp=0.3) on each instance, capped at
+#    --tree-step-budget steps along any root->leaf path.
+# 2. At each leaf evaluates the produced patch with the *real* SWE-bench
+#    harness, using the Singularity backend (no Docker required). The
+#    instance image is pulled once into ``--tree-eval-sif-cache`` and reused
+#    across runs.
+# 3. The runner emits <inst>.steps.csv into CSV_OUT_DIR online — one CSV per
+#    instance, as soon as that instance's tree finishes. No batch
+#    post-processing step is needed.
 #
 # Usage
 # -----
-#   bash scripts/run_mc_fork.sh                    # uses defaults below
-#   OUTPUT_DIR=results/mc_run_1 bash scripts/run_mc_fork.sh
+#   bash scripts/run_mc_fork.sh                          # uses defaults below
+#   OUTPUT_DIR=results/run1 SLICE=1:5 bash scripts/run_mc_fork.sh
 #
-# Required env (caller decides how to provide):
-#   - A reachable LiteLLM-compatible endpoint (e.g. local vLLM on $MODEL_API_BASE)
-#   - SWE-bench dataset access (HuggingFace cache)
-#   - singularity executable on PATH
+# Required runtime context
+# ------------------------
+#   - ``module load singularity`` (real binary in /opt/singularity/<ver>/bin)
+#   - ``source ~/.venvs/mon_agent_env/bin/activate``
+#   - LiteLLM-compatible endpoint configured via the YAML (e.g. DeepSeek)
+#   - HuggingFace cache populated for the SWE-bench dataset
+#
+# First call for a new instance does ``singularity pull`` (~1GB, 5-10 min);
+# subsequent calls reuse the cached .sif.
 
 set -euo pipefail
 
-OUTPUT_DIR="${OUTPUT_DIR:-results/mc_smoke}"
+# --------------------------------------------------------------------------- #
+# Knobs (override via env)                                                    #
+# --------------------------------------------------------------------------- #
+# Heavy outputs (trajectories, tree.json, preds, .sif images) live on scratch
+# (~10TB on Great Lakes). Lightweight per-instance CSVs are written into the
+# project's local ./results/<run_name>/ directory at the end so they are easy
+# to inspect / commit / sync.
+SCRATCH_BASE="${SCRATCH_BASE:-/scratch/alkontar_root/alkontar0/kevinwyk}"
+RUN_NAME="${RUN_NAME:-tree_run}"
+OUTPUT_DIR="${OUTPUT_DIR:-${SCRATCH_BASE}/mon_agent/${RUN_NAME}}"
+CSV_OUT_DIR="${CSV_OUT_DIR:-${PWD}/results/${RUN_NAME}}"
 CONFIG="${CONFIG:-configs/swebench_lite.yaml}"
 SUBSET="${SUBSET:-lite}"
-SPLIT="${SPLIT:-dev}"
-SLICE="${SLICE:-1:2}"               # only run the first instance by default
-WORKERS="${WORKERS:-1}"            # MC forks are sequential per-instance; cross-instance parallelism only
+SPLIT="${SPLIT:-test}"
+SLICE="${SLICE:-0:25}"              # first 25 test-split instances by default
+WORKERS="${WORKERS:-4}"             # cross-instance concurrency
+SIF_CACHE="${SIF_CACHE:-${SCRATCH_BASE}/swebench_sif}"
 
-# MC knobs
-MC_FORK_EVERY="${MC_FORK_EVERY:-5}"
-MC_SAMPLES="${MC_SAMPLES:-2}"
-MC_TEMPERATURE="${MC_TEMPERATURE:-0.3}"
-MC_TOP_P="${MC_TOP_P:-0.95}"
-MC_MAX_FORK_STEPS="${MC_MAX_FORK_STEPS:-30}"
-# Dynamic cap: at snapshot step k, fork runs at most max(MIN, TOTAL - k) steps.
-# Set MC_MAX_FORK_STEPS_TOTAL=0 to disable and fall back to MC_MAX_FORK_STEPS.
-MC_MAX_FORK_STEPS_MIN="${MC_MAX_FORK_STEPS_MIN:-40}"
-MC_MAX_FORK_STEPS_TOTAL="${MC_MAX_FORK_STEPS_TOTAL:-60}"
-MC_FORK_COST_BUDGET="${MC_FORK_COST_BUDGET:-1.0}"
-MC_SNAPSHOT_CWD="${MC_SNAPSHOT_CWD:-/testbed}"
+# Tree-search knobs
+TREE_FORK_EVERY="${TREE_FORK_EVERY:-5}"
+TREE_STEP_BUDGET="${TREE_STEP_BUDGET:-60}"
+TREE_FORK_COST_BUDGET="${TREE_FORK_COST_BUDGET:-5.0}"
+TREE_SNAPSHOT_CWD="${TREE_SNAPSHOT_CWD:-/testbed}"
 
-mkdir -p "${OUTPUT_DIR}"
+# Harness eval knobs
+EVAL_HARNESS="${EVAL_HARNESS:-1}"   # 1 = run real SWE-bench harness on each leaf
+EVAL_BACKEND="${EVAL_BACKEND:-singularity}"   # 'docker' or 'singularity'
+EVAL_TIMEOUT_S="${EVAL_TIMEOUT_S:-1800}"
 
-mon-agent-runner \
-  -c "${CONFIG}" \
-  --subset "${SUBSET}" \
-  --split "${SPLIT}" \
-  --slice "${SLICE}" \
-  -w "${WORKERS}" \
-  -o "${OUTPUT_DIR}" \
-  --mc-fork \
-  --mc-fork-every "${MC_FORK_EVERY}" \
-  --mc-samples "${MC_SAMPLES}" \
-  --mc-temperature "${MC_TEMPERATURE}" \
-  --mc-top-p "${MC_TOP_P}" \
-  --mc-max-fork-steps "${MC_MAX_FORK_STEPS}" \
-  --mc-max-fork-steps-min "${MC_MAX_FORK_STEPS_MIN}" \
-  --mc-max-fork-steps-total "${MC_MAX_FORK_STEPS_TOTAL}" \
-  --mc-fork-cost-budget "${MC_FORK_COST_BUDGET}" \
-  --mc-snapshot-cwd "${MC_SNAPSHOT_CWD}"
+# --------------------------------------------------------------------------- #
+# Sanity checks                                                               #
+# --------------------------------------------------------------------------- #
+if ! command -v singularity >/dev/null 2>&1 \
+   || ! file "$(command -v singularity)" 2>/dev/null | grep -q ELF; then
+  cat >&2 <<'MSG'
+[run_mc_fork] singularity not on PATH (or PATH points at a text stub).
+              Run:  module load singularity
+              and verify:  which singularity  ->  /opt/singularity/.../bin/singularity
+MSG
+  exit 1
+fi
+
+if ! command -v mon-agent-runner >/dev/null 2>&1; then
+  cat >&2 <<'MSG'
+[run_mc_fork] mon-agent-runner not on PATH.
+              Run:  source ~/.venvs/mon_agent_env/bin/activate
+MSG
+  exit 1
+fi
+
+mkdir -p "${OUTPUT_DIR}" "${SIF_CACHE}" "${CSV_OUT_DIR}"
+
+cat <<EOF
+[run_mc_fork] config
+  OUTPUT_DIR              = ${OUTPUT_DIR}
+  CSV_OUT_DIR             = ${CSV_OUT_DIR}
+  CONFIG                  = ${CONFIG}
+  SUBSET / SPLIT / SLICE  = ${SUBSET} / ${SPLIT} / ${SLICE}
+  WORKERS                 = ${WORKERS}
+  TREE_FORK_EVERY         = ${TREE_FORK_EVERY}
+  TREE_STEP_BUDGET        = ${TREE_STEP_BUDGET}
+  TREE_FORK_COST_BUDGET   = ${TREE_FORK_COST_BUDGET}
+  TREE_SNAPSHOT_CWD       = ${TREE_SNAPSHOT_CWD}
+  EVAL_HARNESS            = ${EVAL_HARNESS}
+  EVAL_BACKEND            = ${EVAL_BACKEND}
+  SIF_CACHE               = ${SIF_CACHE}
+EOF
+
+# --------------------------------------------------------------------------- #
+# 1) Run tree search                                                          #
+# --------------------------------------------------------------------------- #
+runner_args=(
+  -c "${CONFIG}"
+  --subset "${SUBSET}"
+  --split "${SPLIT}"
+  --slice "${SLICE}"
+  -w "${WORKERS}"
+  -o "${OUTPUT_DIR}"
+  --csv-out-dir "${CSV_OUT_DIR}"
+  --tree-search
+  --tree-fork-every "${TREE_FORK_EVERY}"
+  --tree-step-budget "${TREE_STEP_BUDGET}"
+  --tree-fork-cost-budget "${TREE_FORK_COST_BUDGET}"
+  --tree-snapshot-cwd "${TREE_SNAPSHOT_CWD}"
+)
+if [[ "${EVAL_HARNESS}" == "1" ]]; then
+  runner_args+=(
+    --tree-eval-harness
+    --tree-eval-backend "${EVAL_BACKEND}"
+    --tree-eval-sif-cache "${SIF_CACHE}"
+    --mc-eval-timeout-s "${EVAL_TIMEOUT_S}"
+  )
+fi
+
+echo "[$(date -Iseconds)] mon-agent-runner ${runner_args[*]}"
+mon-agent-runner "${runner_args[@]}"
+
+# --------------------------------------------------------------------------- #
+# 2) Summary                                                                  #
+# --------------------------------------------------------------------------- #
+# CSVs are already on disk: the runner writes <inst>.steps.csv into          #
+# CSV_OUT_DIR as soon as each instance finishes (no batch post-processing). #
+echo
+echo "Heavy artifacts under ${OUTPUT_DIR}:"
+find "${OUTPUT_DIR}" -maxdepth 2 -type f \
+    \( -name '*.traj.json' -o -name '*.tree.json' \
+       -o -name '*.tree.jsonl' \
+       -o -name 'preds.json' -o -name 'minisweagent.log' \) | sort
 
 echo
-echo "Done. Inspect results:"
-echo "  jq . ${OUTPUT_DIR}/*/$(basename ${OUTPUT_DIR})*/*.mc.jsonl 2>/dev/null || find ${OUTPUT_DIR} -name '*.mc.jsonl'"
+echo "CSV outputs under ${CSV_OUT_DIR}:"
+find "${CSV_OUT_DIR}" -maxdepth 1 -type f -name '*.steps.csv' | sort
+
+echo
+echo "Per-instance y_root summary:"
+python3 - <<PY
+import json, glob, os
+for p in sorted(glob.glob("${OUTPUT_DIR}/*/*.tree.json")):
+    try:
+        d = json.load(open(p))
+        s = d.get("stats", {})
+        inst = os.path.basename(os.path.dirname(p))
+        print(f"  {inst:<45s} y_root={s.get('y_root'):.3f}  "
+              f"n_leaves={s.get('n_leaves')}  n_success={s.get('n_success')}  "
+              f"wall_s={s.get('wall_s')}")
+    except Exception as e:
+        print(f"  {p}: ERR {e}")
+PY

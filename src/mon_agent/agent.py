@@ -63,11 +63,13 @@ class MonitoringAgent(DefaultAgent):
         task: str = "",
         mc_config: dict[str, Any] | MCForkConfig | None = None,
         is_fork: bool = False,
+        instance_id: str = "",
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
         self.step_logs: list[dict[str, Any]] = []
         self._task_text: str = task
+        self.instance_id: str = instance_id
         self._failure_streak: int = 0
         self._last_test_output: str = ""
         # Monte-Carlo fork settings (skip entirely when this agent IS itself a fork)

@@ -163,69 +163,66 @@ Then:
 
 ## Formal Definition of Y_k
 
-Use the following main definition:
+Main definition:
 
 \[
 Y_k := \Pr(\text{eventual success} \mid \text{prefix}_k)
 \]
 
-Interpretation:
-
-- after step \(k\), how likely is the task to still be solvable from the current prefix?
-
-This is the recommended primary monitoring score.
+Interpretation: after step \(k\), how likely is the task still solvable from the current prefix?
 
 ---
 
-## How to Estimate Y_k
+## How to Estimate Y_k — Recursive Binary Branching
 
-### Phase 1: Cheap approximation
-Use the eventual result of the original run as the prefix label.
+Instead of a flat "main + M independent forks every K steps", we use a **recursive binary tree** of rollouts that share one Singularity sandbox via git snapshot/restore (see `src/mon_agent/tree_search.py`).
 
-For each prefix in a trajectory:
+### Tree construction
 
-\[
-\tilde Y_k = \mathbf{1}(\text{the run eventually succeeds})
-\]
+- Every \(K\) steps the current prefix splits into \(B=2\) children:
+  - **left child**: temperature 0.0 (deterministic baseline),
+  - **right child**: temperature 0.3 (diverse sibling).
+- Each child runs \(K\) more steps from the parent's git snapshot, then splits again.
+- Recursion stops on a branch when:
+  - the branch terminates (`Submitted` / limits exceeded / exception), or
+  - cumulative step count reaches `step_budget` (default 60).
+- Node IDs are dotted paths (`0`, `0.0`, `0.1.0`, ...); the last digit selects left/right and therefore the temperature.
 
-Then train a small predictor:
+### Leaf and internal labels
 
-\[
-\hat Y_k = f_\theta(\text{prefix}_k)
-\]
+- **Leaf success**: harness `resolved` if eval enabled and the patch is non-empty, else the proxy `submission != "" and exit_status == "Submitted"`.
+- **Leaf score**: \(y(\text{leaf}) = 1\) if success else \(0\).
+- **Internal score**: \(y(v) = \operatorname{mean}\bigl(y(c) : c \in \text{children}(v)\bigr)\).
 
-This is coarse, but very easy to implement.
-
-### Phase 2: Better approximation
-Use continuation rollouts from intermediate prefixes.
-
-For a saved prefix \(\text{prefix}_k\), continue the agent from that state for \(M\) runs under a fixed remaining budget:
-
-\[
-\hat Y_k^{MC} = \frac{1}{M}\sum_{m=1}^M \mathbf{1}(\text{continuation } m \text{ succeeds})
-\]
-
-Then train:
+This gives a tree-MC estimate
 
 \[
-\hat Y_k = f_\theta(\text{prefix}_k)
+\hat Y_k^{\text{tree}}(v) = \text{average leaf success in the subtree rooted at } v.
 \]
 
-This is closer to the true definition of future solvability.
+for every node \(v\) covering steps \([s_v, e_v]\).
+
+### Per-step Y_k (global view)
+
+For a single instance, we also collapse the tree to a per-step score by averaging over all paths whose prefix contains step \(k\):
+
+\[
+Y_k^{\text{global}}
+= \frac{\#\{\text{leaves whose ancestor chain covers step } k \text{ and that succeeded}\}}
+        {\#\{\text{leaves whose ancestor chain covers step } k\}}
+\]
+
+This is what `results/compute_y_global.py` produces from `<inst>.tree.jsonl`.
 
 ---
 
-## Recommended Training Target for the First Implementation
+## Phased Training Target
 
-Start with:
+1. **Phase 1 (cheap label)**: use eventual success of the original run as a per-prefix label
+   \(\tilde Y_k = \mathbf{1}(\text{run succeeds})\) and fit \(\hat Y_k = f_\theta(\text{prefix}_k)\).
+2. **Phase 2 (tree label)**: replace the label with \(\hat Y_k^{\text{tree}}\) / \(Y_k^{\text{global}}\) computed from the binary tree above.
 
-\[
-\hat Y_k = \Pr(\text{eventual success} \mid \text{prefix}_k)
-\]
-
-using the **cheap approximation** first.
-
-Do **not** start with degradation-risk labeling first, because those labels are much harder to define cleanly.
+Start from Phase 1; switch to Phase 2 once a small batch of trees is collected. Do **not** start from degradation-risk labels — they are much harder to define cleanly.
 
 ---
 
@@ -300,24 +297,22 @@ Later, a second intervention can be added:
 ## Recommended Experiment Sequence
 
 ### Stage 1
-Run `mini-swe-agent` on a small subset of `SWE-bench Lite` and collect trajectories.
+Run `mini-swe-agent` on a small subset of `SWE-bench Lite` with the **binary tree runner** (`tree_search.py`) and collect, per instance:
+- `<inst>.steps.jsonl` (per-step features for every node),
+- `<inst>.tree.json` / `<inst>.tree.jsonl` (full tree with `y`, `success`).
 
 ### Stage 2
-Extract prefix-level samples and train a cheap \(Y_k\) predictor using eventual success labels.
+Flatten trees into prefix samples and train a cheap \(\hat Y_k\) predictor, first against eventual-success labels, then against tree labels \(\hat Y_k^{\text{tree}}\) / \(Y_k^{\text{global}}\).
 
 ### Stage 3
-Evaluate whether \(\hat Y_k\) or \(\Delta_k\) correlates with hidden degradation patterns such as:
-
-- repeated command loops,
-- repeated file loops,
-- persistent execution failures,
-- long context growth with no test improvement.
+Check whether \(\hat Y_k\) or \(\Delta_k\) correlates with hidden degradation patterns such as repeated command/file loops, persistent execution failures, or long context growth with no test improvement — and whether **left/right sibling divergence** in \(y\) flags risky prefixes early.
 
 ### Stage 4
 Add a simple monitoring rule and compare:
-- baseline
-- monitor-only
-- monitor + early stop
+- baseline (single trajectory),
+- monitor-only,
+- monitor + early stop,
+- monitor + branch-pruning inside the tree (drop low-\(y\) subtrees early to save budget).
 
 ---
 
@@ -337,8 +332,8 @@ The pilot is successful if at least one of the following is true:
 The most feasible method is:
 
 1. define a compact prefix from issue + recent 3-step window + 6 global counters,
-2. train \(Y_k\) as a future solvability score,
-3. monitor \(Y_k\) or \(\Delta_k\) online,
-4. start with early stop as the first intervention.
+2. estimate \(Y_k\) by a **recursive binary-branching tree** (B=2, temperatures 0.0 / 0.3, split every K steps, capped by `step_budget`), with leaf success from harness or `Submitted` proxy and internal nodes = mean of children,
+3. train \(\hat Y_k = f_\theta(\text{prefix}_k)\) against the tree labels (or eventual-success labels as a Phase-1 shortcut),
+4. monitor \(\hat Y_k\) or \(\Delta_k\) online and start with early stop as the first intervention.
 
 This is the cleanest first implementation on `mini-swe-agent`.

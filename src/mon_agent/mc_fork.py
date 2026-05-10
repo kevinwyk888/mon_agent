@@ -102,10 +102,6 @@ class ForkResult:
     wall_s: float
     attempted_submit: bool = False
     error: str = ""
-    step_logs: list[dict] = field(default_factory=list)
-    """Per-step monitoring records produced by the fork itself (same schema as
-    the main `<inst>.steps.jsonl`). Empty when the fork crashed before any
-    step was logged."""
 
 
 @dataclass
@@ -310,7 +306,6 @@ def _fork_rollout_once(
         wall_s=round(time.monotonic() - t0, 2),
         attempted_submit=attempted_submit,
         error=error_str,
-        step_logs=list(fork.step_logs),
     )
 
 

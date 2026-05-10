@@ -30,6 +30,8 @@ from minisweagent.utils.log import add_file_handler, logger
 from minisweagent.utils.serialize import UNSET, recursive_merge
 
 from mon_agent.agent import MonitoringAgent
+from mon_agent.tree_search import TreeSearchConfig, run_tree
+from mon_agent.tree_to_csv import convert_one as tree_convert_one
 
 DEFAULT_CONFIG_FILE = builtin_config_dir / "benchmarks" / "swebench.yaml"
 
@@ -88,6 +90,7 @@ def process_instance(
             env,
             task=task,
             mc_config=config.get("mc_fork"),
+            instance_id=instance_id,
             **agent_config,
         )
 
@@ -103,9 +106,32 @@ def process_instance(
 
         agent.step = _step_with_progress  # type: ignore[assignment]
 
-        info = agent.run(task)
-        exit_status = info.get("exit_status")
-        result = info.get("submission")
+        tree_cfg = TreeSearchConfig.from_dict(config.get("tree_search"))
+        if tree_cfg.enabled:
+            def _tree_progress(node_id: str, seg_agent) -> None:
+                progress_manager.update_instance_status(
+                    instance_id,
+                    f"Tree {node_id} step {seg_agent.n_calls:3d} (${seg_agent.cost:.2f})",
+                )
+
+            _, info = run_tree(
+                agent,
+                task,
+                tree_cfg,
+                instance_id=instance_id,
+                output_dir=instance_dir,
+                progress_cb=_tree_progress,
+            )
+            exit_status = info.get("exit_status")
+            result = info.get("submission")
+            extra_info = {
+                k: v for k, v in info.items()
+                if k not in ("exit_status", "submission")
+            }
+        else:
+            info = agent.run(task)
+            exit_status = info.get("exit_status")
+            result = info.get("submission")
     except Exception as e:
         logger.error("Error processing instance %s: %s", instance_id, e, exc_info=True)
         exit_status, result = type(e).__name__, ""
@@ -132,6 +158,20 @@ def process_instance(
         update_preds_file(
             output_dir / "preds.json", instance_id, model.config.model_name, result
         )
+        # Online CSV export: as soon as <inst>.tree.json is on disk, flatten
+        # it into <inst>.steps.csv under the user-specified csv_out_dir.
+        csv_out_dir = config.get("_csv_out_dir")
+        tree_json_path = instance_dir / f"{instance_id}.tree.json"
+        if csv_out_dir and tree_json_path.exists():
+            try:
+                csv_path = tree_convert_one(
+                    tree_json_path, csv_dir=Path(csv_out_dir)
+                )
+                logger.info("Wrote step-CSV for '%s' -> %s", instance_id, csv_path)
+            except Exception as e:  # pragma: no cover - defensive
+                logger.warning(
+                    "CSV export failed for '%s': %s", instance_id, e
+                )
         progress_manager.on_instance_end(instance_id, exit_status)
 
 
@@ -192,6 +232,45 @@ def main(
     mc_snapshot_cwd: str = typer.Option(
         "/testbed", "--mc-snapshot-cwd", help="Container working dir to snapshot via git."
     ),
+    # ------------------------------------------------------------------
+    # Binary tree-search flags (recursive split, replaces flat MC fork)
+    # ------------------------------------------------------------------
+    tree_search: bool = typer.Option(
+        False, "--tree-search/--no-tree-search",
+        help="Drive a recursive binary tree search instead of a single trajectory.",
+    ),
+    tree_fork_every: int = typer.Option(
+        10, "--tree-fork-every", help="Split every K steps along any branch.",
+    ),
+    tree_step_budget: int = typer.Option(
+        60, "--tree-step-budget", help="Hard cap on cumulative steps along any root->leaf path.",
+    ),
+    tree_fork_cost_budget: float = typer.Option(
+        5.0, "--tree-fork-cost-budget", help="Max additional $ cost per child segment.",
+    ),
+    tree_snapshot_cwd: str = typer.Option(
+        "/testbed", "--tree-snapshot-cwd", help="Container working dir to snapshot via git.",
+    ),
+    tree_eval_harness: bool = typer.Option(
+        False, "--tree-eval-harness/--no-tree-eval-harness",
+        help="Score every leaf with the official SWE-bench harness.",
+    ),
+    tree_eval_backend: str = typer.Option(
+        "singularity", "--tree-eval-backend",
+        help="Harness backend: 'docker' or 'singularity'.",
+    ),
+    tree_eval_sif_cache: str = typer.Option(
+        "", "--tree-eval-sif-cache",
+        help="Singularity .sif image cache dir (only used with --tree-eval-backend=singularity).",
+    ),
+    mc_eval_timeout_s: int = typer.Option(
+        1800, "--mc-eval-timeout-s",
+        help="Per-leaf harness evaluation wall-clock cap (seconds).",
+    ),
+    csv_out_dir: str = typer.Option(
+        "", "--csv-out-dir",
+        help="If set, flatten each instance's tree.json into <inst>.steps.csv here.",
+    ),
 ) -> None:
     """Run mini-SWE-agent on SWE-bench with MonitoringAgent."""
     output_path = Path(output)
@@ -230,9 +309,24 @@ def main(
                 "fork_cost_budget": mc_fork_cost_budget,
                 "snapshot_cwd": mc_snapshot_cwd,
             },
+            "tree_search": {
+                "enabled": tree_search,
+                "fork_every": tree_fork_every,
+                "step_budget": tree_step_budget,
+                "fork_cost_budget": tree_fork_cost_budget,
+                "snapshot_cwd": tree_snapshot_cwd,
+                "evaluate_with_harness": tree_eval_harness,
+                "harness_backend": tree_eval_backend,
+                "harness_sif_cache_dir": tree_eval_sif_cache,
+                "harness_timeout_s": mc_eval_timeout_s,
+            },
+            "_csv_out_dir": csv_out_dir or None,
         }
     )
     config = recursive_merge(*configs)
+    if csv_out_dir:
+        Path(csv_out_dir).mkdir(parents=True, exist_ok=True)
+        logger.info("Per-instance CSVs will be written to %s", csv_out_dir)
 
     progress_manager = RunBatchProgressManager(
         len(instances), output_path / f"exit_statuses_{time.time()}.yaml"

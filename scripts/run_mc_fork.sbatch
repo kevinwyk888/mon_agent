@@ -1,35 +1,44 @@
 #!/bin/bash
-# SLURM batch script: run mon-agent MC-fork experiment + post-processing.
+# SLURM batch script: run mon-agent tree search + harness eval + CSV export.
 #
-# Submit:
+# Submit (defaults: results/tree_run_<jobid>, slice 0:25, lite/test):
 #     sbatch scripts/run_mc_fork.sbatch
 #
-# Override knobs at submit time, e.g.:
-#     sbatch --export=ALL,SLICE=1:10,OUTPUT_DIR=results/mc_run_1 \
+# Override knobs at submit time:
+#     sbatch --export=ALL,SLICE=0:300,SPLIT=test,OUTPUT_DIR=results/full_lite_test \
 #            scripts/run_mc_fork.sbatch
-#     sbatch --export=ALL,MC_SAMPLES=4,MC_TEMPERATURE=0.7,MC_FORK_EVERY=8 \
+#     sbatch --export=ALL,TREE_FORK_EVERY=15,TREE_STEP_BUDGET=90 \
 #            scripts/run_mc_fork.sbatch
 #
 # What this script does
 # ---------------------
 #   1. activates the project venv,
-#   2. runs scripts/run_mc_fork.sh (the actual experiment),
-#   3. computes y_global per instance,
-#   4. merges main + all forks into <inst>.all_steps.jsonl with y_global.
+#   2. runs scripts/run_mc_fork.sh
+#      (binary tree search + Singularity-backed SWE-bench harness eval).
+#      The runner emits <inst>.steps.csv into CSV_OUT_DIR online, one per
+#      instance as it finishes — no separate post-processing step.
 #
 # Required runtime context (provided by caller, not by this script):
-#   - a reachable LiteLLM endpoint, e.g. exported MODEL_API_BASE pointing at a
-#     vLLM server. Forward over an SSH tunnel or run vLLM in a sibling job.
 #   - HuggingFace cache populated with the SWE-bench dataset.
-#   - `module load singularity` on this cluster (loaded below).
+#   - Model API key (e.g. DEEPSEEK_API_KEY) in the environment that LiteLLM
+#     reads, or already present in ~/.config/mini-swe-agent/.env.
+#   - Module ``singularity`` (loaded below) — this also implies first-time
+#     instances will pull a ~1GB SWE-bench image into ${SIF_CACHE}.
+#
+# Resource sizing
+# ---------------
+# The agent itself does no GPU work (it calls a remote LLM API). GPUs are
+# requested only because the cluster's spgpu partition requires them; tune
+# down if your account allows. Singularity exec for SWE-bench evaluation is
+# CPU-bound (~20-60s/leaf). Increase --time for large slices.
 
-#SBATCH --job-name=mon_mc
+#SBATCH --job-name=mon_tree
 #SBATCH --account=alkontar0
 #SBATCH --partition=spgpu
 #SBATCH --gpus=2
-#SBATCH --cpus-per-task=8
-#SBATCH --mem=64G
-#SBATCH --time=8:00:00
+#SBATCH --cpus-per-task=16
+#SBATCH --mem=96G
+#SBATCH --time=10:00:00
 #SBATCH --output=logs/slurm-%j.out
 #SBATCH --error=logs/slurm-%j.err
 # #SBATCH --mail-type=BEGIN,END,FAIL
@@ -51,6 +60,8 @@ mkdir -p logs
 # Environment
 # ---------------------------------------------------------------------------
 module load singularity 2>/dev/null || true
+# Some clusters require an explicit version:
+# module load singularity/4.3.4
 
 VENV="${VENV:-$HOME/.venvs/mon_agent_env}"
 # shellcheck disable=SC1091
@@ -60,70 +71,50 @@ source "${VENV}/bin/activate"
 export TOKENIZERS_PARALLELISM="${TOKENIZERS_PARALLELISM:-false}"
 
 # ---------------------------------------------------------------------------
-# Experiment knobs (mirror run_mc_fork.sh defaults; override via --export=ALL,...)
+# Experiment knobs (override via --export=ALL,KEY=VAL,...)
 # ---------------------------------------------------------------------------
-export OUTPUT_DIR="${OUTPUT_DIR:-results/mc_run_${SLURM_JOB_ID:-local}}"
+# Heavy outputs go to scratch (~10TB). Per-instance CSVs land under
+# ${PWD}/results/${RUN_NAME}/ (handled by run_mc_fork.sh).
+export SCRATCH_BASE="${SCRATCH_BASE:-/scratch/alkontar_root/alkontar0/kevinwyk}"
+export RUN_NAME="${RUN_NAME:-tree_run_${SLURM_JOB_ID:-local}}"
+export OUTPUT_DIR="${OUTPUT_DIR:-${SCRATCH_BASE}/mon_agent/${RUN_NAME}}"
+export CSV_OUT_DIR="${CSV_OUT_DIR:-${SLURM_SUBMIT_DIR:-$PWD}/results/${RUN_NAME}}"
 export CONFIG="${CONFIG:-configs/swebench_lite.yaml}"
 export SUBSET="${SUBSET:-lite}"
-export SPLIT="${SPLIT:-dev}"
-export SLICE="${SLICE:-1:100}"
-export WORKERS="${WORKERS:-1}"
+export SPLIT="${SPLIT:-test}"
+export SLICE="${SLICE:-0:25}"
+export WORKERS="${WORKERS:-16}"
+export SIF_CACHE="${SIF_CACHE:-${SCRATCH_BASE}/swebench_sif}"
 
-export MC_FORK_EVERY="${MC_FORK_EVERY:-5}"
-export MC_SAMPLES="${MC_SAMPLES:-2}"
-export MC_TEMPERATURE="${MC_TEMPERATURE:-0.3}"
-export MC_TOP_P="${MC_TOP_P:-0.95}"
-export MC_MAX_FORK_STEPS="${MC_MAX_FORK_STEPS:-30}"
-export MC_MAX_FORK_STEPS_MIN="${MC_MAX_FORK_STEPS_MIN:-40}"
-export MC_MAX_FORK_STEPS_TOTAL="${MC_MAX_FORK_STEPS_TOTAL:-60}"
-export MC_FORK_COST_BUDGET="${MC_FORK_COST_BUDGET:-1.0}"
-export MC_SNAPSHOT_CWD="${MC_SNAPSHOT_CWD:-/testbed}"
+export TREE_FORK_EVERY="${TREE_FORK_EVERY:-10}"
+export TREE_STEP_BUDGET="${TREE_STEP_BUDGET:-60}"
+export TREE_FORK_COST_BUDGET="${TREE_FORK_COST_BUDGET:-5.0}"
+export TREE_SNAPSHOT_CWD="${TREE_SNAPSHOT_CWD:-/testbed}"
+
+export EVAL_HARNESS="${EVAL_HARNESS:-1}"
+export EVAL_BACKEND="${EVAL_BACKEND:-singularity}"
+export EVAL_TIMEOUT_S="${EVAL_TIMEOUT_S:-1800}"
 
 cat <<EOF
 [config]
   OUTPUT_DIR              = ${OUTPUT_DIR}
+  CSV_OUT_DIR             = ${CSV_OUT_DIR}
   CONFIG                  = ${CONFIG}
   SUBSET / SPLIT / SLICE  = ${SUBSET} / ${SPLIT} / ${SLICE}
   WORKERS                 = ${WORKERS}
-  MC_FORK_EVERY           = ${MC_FORK_EVERY}
-  MC_SAMPLES              = ${MC_SAMPLES}
-  MC_TEMPERATURE / TOP_P  = ${MC_TEMPERATURE} / ${MC_TOP_P}
-  MC_MAX_FORK_STEPS (stat)= ${MC_MAX_FORK_STEPS}
-  MC_MAX_FORK_STEPS_MIN   = ${MC_MAX_FORK_STEPS_MIN}
-  MC_MAX_FORK_STEPS_TOTAL = ${MC_MAX_FORK_STEPS_TOTAL}
-  MC_FORK_COST_BUDGET     = ${MC_FORK_COST_BUDGET}
-  MC_SNAPSHOT_CWD         = ${MC_SNAPSHOT_CWD}
-  MODEL_API_BASE          = ${MODEL_API_BASE:-<unset — relying on config-provided endpoint>}
+  TREE_FORK_EVERY         = ${TREE_FORK_EVERY}
+  TREE_STEP_BUDGET        = ${TREE_STEP_BUDGET}
+  TREE_FORK_COST_BUDGET   = ${TREE_FORK_COST_BUDGET}
+  TREE_SNAPSHOT_CWD       = ${TREE_SNAPSHOT_CWD}
+  EVAL_HARNESS            = ${EVAL_HARNESS}
+  EVAL_BACKEND            = ${EVAL_BACKEND}
+  SIF_CACHE               = ${SIF_CACHE}
 EOF
 
 # ---------------------------------------------------------------------------
-# 1) Experiment
+# Run experiment + CSV export (run_mc_fork.sh handles both stages)
 # ---------------------------------------------------------------------------
-echo "[$(date -Iseconds)] Stage 1/3: run_mc_fork.sh"
+echo "[$(date -Iseconds)] Stage: run_mc_fork.sh"
 bash scripts/run_mc_fork.sh
-
-# ---------------------------------------------------------------------------
-# 2) Per-instance y_global CSV
-# ---------------------------------------------------------------------------
-echo "[$(date -Iseconds)] Stage 2/3: compute_y_global"
-python results/compute_y_global.py "${OUTPUT_DIR}" || \
-    echo "[warn] compute_y_global failed; continuing"
-
-# ---------------------------------------------------------------------------
-# 3) Merge main + all forks into <inst>.all_steps.jsonl
-# ---------------------------------------------------------------------------
-echo "[$(date -Iseconds)] Stage 3/3: merge_all_steps"
-python results/merge_all_steps.py "${OUTPUT_DIR}" || \
-    echo "[warn] merge_all_steps failed; continuing"
-
-# ---------------------------------------------------------------------------
-# Summary
-# ---------------------------------------------------------------------------
-echo
-echo "Artifacts under ${OUTPUT_DIR}:"
-find "${OUTPUT_DIR}" -maxdepth 2 -type f \
-    \( -name '*.traj.json' -o -name '*.steps.jsonl' \
-       -o -name '*.mc.jsonl' -o -name '*.y_global.csv' \
-       -o -name '*.all_steps.jsonl' \) | sort
 
 echo "[$(date -Iseconds)] Job ${SLURM_JOB_ID:-local} finished"
