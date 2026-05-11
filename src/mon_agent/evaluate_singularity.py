@@ -39,6 +39,7 @@ import logging
 import os
 import re as _re
 import shutil
+import signal
 import subprocess
 import tempfile
 import time
@@ -46,6 +47,61 @@ from dataclasses import dataclass
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
+
+
+def _run_pg(
+    cmd: list[str],
+    *,
+    timeout_s: int,
+    capture_output: bool = True,
+) -> tuple[int, str, str, bool]:
+    """Run ``cmd`` in its own process group; on timeout kill the whole group.
+
+    Returns ``(returncode, stdout, stderr, timed_out)``.
+
+    Why a new process group: ``subprocess.run(timeout=...)`` only kills the
+    immediate child. When that child is ``singularity exec`` (or ``bash``
+    inside the container without ``--pid``) it forks grandchildren — e.g.
+    Django's ``tests/runtests.py`` multiprocessing pool — that survive in the
+    host PID namespace as orphans, still holding the stdout/stderr pipes.
+    The parent worker thread then deadlocks in ``communicate()`` waiting for
+    EOF that never comes. Spawning with ``start_new_session=True`` puts the
+    whole tree in a fresh pgid; on timeout we ``killpg`` the group so every
+    descendant dies and the pipes close cleanly.
+    """
+    stdout_arg = subprocess.PIPE if capture_output else None
+    stderr_arg = subprocess.PIPE if capture_output else None
+    proc = subprocess.Popen(
+        cmd,
+        stdout=stdout_arg,
+        stderr=stderr_arg,
+        text=True,
+        start_new_session=True,
+    )
+    pgid = os.getpgid(proc.pid)
+    timed_out = False
+    try:
+        out, err = proc.communicate(timeout=timeout_s)
+    except subprocess.TimeoutExpired:
+        timed_out = True
+        for sig in (signal.SIGTERM, signal.SIGKILL):
+            try:
+                os.killpg(pgid, sig)
+            except ProcessLookupError:
+                break
+            try:
+                out, err = proc.communicate(timeout=5)
+                break
+            except subprocess.TimeoutExpired:
+                continue
+        else:
+            # Final fallback: detach pipes so the worker thread does not hang.
+            try:
+                proc.kill()
+            except Exception:
+                pass
+            out, err = "", ""
+    return proc.returncode if proc.returncode is not None else -9, out or "", err or "", timed_out
 
 # Same fallback chain the upstream harness uses to apply the model patch.
 _GIT_APPLY_CMDS = [
@@ -155,15 +211,12 @@ def _ensure_sif(image_key: str, sif_path: Path, *, sing_exe: str, timeout_s: int
         tmp.unlink()
     cmd = [sing_exe, "pull", "--force", str(tmp), f"docker://{image_key}"]
     logger.info("singularity pull: %s", " ".join(cmd))
-    try:
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout_s, check=False
-        )
-    except subprocess.TimeoutExpired:
+    rc, _out, err, timed_out = _run_pg(cmd, timeout_s=timeout_s)
+    if timed_out:
         return f"pull_timeout>{timeout_s}s"
-    if proc.returncode != 0:
-        tail = (proc.stderr or proc.stdout or "")[-1500:]
-        return f"pull_rc={proc.returncode}:{tail.strip()[:500]}"
+    if rc != 0:
+        tail = (err or _out or "")[-1500:]
+        return f"pull_rc={rc}:{tail.strip()[:500]}"
     try:
         tmp.replace(sif_path)
     except Exception as e:
@@ -215,6 +268,12 @@ def _run_container(
         "--writable-tmpfs",
         "--containall",
         "--cleanenv",
+        # ``--pid`` puts the container in its own PID namespace, so when
+        # singularity exits every descendant (Django's multiprocessing pool,
+        # pytest-xdist workers, etc.) is reaped by the kernel instead of
+        # being orphaned to the host. Without this, killing the singularity
+        # process leaves grandchildren behind, hanging worker pipes.
+        "--pid",
         "--bind", f"{work_path}:/eval_io",
         str(sif_path),
         "bash", "/eval_io/run.sh",
@@ -224,13 +283,10 @@ def _run_container(
         sif_idx = cmd.index(str(sif_path))
         cmd[sif_idx:sif_idx] = list(extra_singularity_args)
     logger.info("singularity exec: %s", " ".join(cmd))
-    try:
-        proc = subprocess.run(
-            cmd, capture_output=True, text=True, timeout=timeout_s, check=False
-        )
-    except subprocess.TimeoutExpired as e:
-        return 124, (e.stdout or ""), f"exec_timeout>{timeout_s}s"
-    return proc.returncode, (proc.stdout or ""), (proc.stderr or "")
+    rc, out, err, timed_out = _run_pg(cmd, timeout_s=timeout_s)
+    if timed_out:
+        return 124, out, (err + f"\nexec_timeout>{timeout_s}s").strip()
+    return rc, out, err
 
 
 # --------------------------------------------------------------------------- #
@@ -259,11 +315,10 @@ def evaluate_submission(
 ) -> EvalResult:
     """Evaluate a single SWE-bench (instance, patch) using Singularity.
 
-    Drop-in replacement for :func:`mon_agent.evaluate.evaluate_submission` on
-    machines with Singularity but no Docker. ``namespace`` / ``max_workers``
-    / ``python_exe`` / ``extra_args`` are accepted for signature parity but
-    have no effect here (the namespace is fixed to ``swebench`` because that
-    is what is on Docker Hub).
+    ``namespace`` / ``max_workers`` / ``python_exe`` / ``extra_args`` are
+    accepted for signature parity with older Docker-based variants but have
+    no effect here (the namespace is fixed to ``swebench`` because that is
+    what is on Docker Hub).
     """
     t0 = time.monotonic()
 

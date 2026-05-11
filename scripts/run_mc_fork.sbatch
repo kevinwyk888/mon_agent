@@ -38,7 +38,7 @@
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=96G
-#SBATCH --time=12:00:00
+#SBATCH --time=16:00:00
 #SBATCH --output=logs/slurm-%j.out
 #SBATCH --error=logs/slurm-%j.err
 # #SBATCH --mail-type=BEGIN,END,FAIL
@@ -88,7 +88,11 @@ export RUN_NAME="${RUN_NAME:-tree_run_${SLURM_JOB_ID:-local}}"
 export OUTPUT_DIR="${OUTPUT_DIR:-${SCRATCH_BASE}/mon_agent/${RUN_NAME}}"
 export CSV_OUT_DIR="${CSV_OUT_DIR:-${SLURM_SUBMIT_DIR:-$PWD}/results/${RUN_NAME}}"
 export CONFIG="${CONFIG:-configs/swebench_lite.yaml}"
-export SUBSET="${SUBSET:-lite}"
+# SUBSET selects the SWE-bench dataset. Aliases (resolved by runner):
+#   lite      = princeton-nlp/SWE-Bench_Lite      (300 short-patch tasks)
+#   verified  = princeton-nlp/SWE-Bench_Verified  (500 human-vetted tasks)
+#   full      = princeton-nlp/SWE-Bench           (2294 tasks)
+export SUBSET="${SUBSET:-verified}"
 export SPLIT="${SPLIT:-test}"
 export SLICE="${SLICE:-0:50}"
 # Override the model defined in CONFIG. Common values:
@@ -102,7 +106,7 @@ export WORKERS="${WORKERS:-8}"
 export SIF_CACHE="${SIF_CACHE:-${SCRATCH_BASE}/swebench_sif}"
 
 export TREE_FORK_EVERY="${TREE_FORK_EVERY:-10}"
-export TREE_STEP_BUDGET="${TREE_STEP_BUDGET:-60}"
+export TREE_STEP_BUDGET="${TREE_STEP_BUDGET:-80}"
 export TREE_FORK_COST_BUDGET="${TREE_FORK_COST_BUDGET:-5.0}"
 export TREE_SNAPSHOT_CWD="${TREE_SNAPSHOT_CWD:-/testbed}"
 export TREE_TEMPERATURE_LEFT="${TREE_TEMPERATURE_LEFT:-0.3}"

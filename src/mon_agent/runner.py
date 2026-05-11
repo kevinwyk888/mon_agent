@@ -265,7 +265,7 @@ def main(
     ),
     tree_eval_backend: str = typer.Option(
         "singularity", "--tree-eval-backend",
-        help="Harness backend: 'docker' or 'singularity'.",
+        help="Harness backend (only 'singularity' is supported; flag kept for back-compat).",
     ),
     tree_eval_sif_cache: str = typer.Option(
         "", "--tree-eval-sif-cache",
@@ -329,6 +329,7 @@ def main(
                 "harness_backend": tree_eval_backend,
                 "harness_sif_cache_dir": tree_eval_sif_cache,
                 "harness_timeout_s": mc_eval_timeout_s,
+                "dataset_name": dataset_path,
             },
             "_csv_out_dir": csv_out_dir or None,
         }

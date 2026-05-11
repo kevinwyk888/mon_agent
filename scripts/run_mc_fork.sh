@@ -43,6 +43,7 @@ RUN_NAME="${RUN_NAME:-tree_run}"
 OUTPUT_DIR="${OUTPUT_DIR:-${SCRATCH_BASE}/mon_agent/${RUN_NAME}}"
 CSV_OUT_DIR="${CSV_OUT_DIR:-${PWD}/results/${RUN_NAME}}"
 CONFIG="${CONFIG:-configs/swebench_lite.yaml}"
+# SUBSET selects the SWE-bench dataset: lite | verified | full
 SUBSET="${SUBSET:-lite}"
 SPLIT="${SPLIT:-test}"
 SLICE="${SLICE:-0:25}"              # first 25 test-split instances by default

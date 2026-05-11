@@ -108,9 +108,9 @@ class TreeSearchConfig:
     harness_work_dir: str = ""
     harness_python: str = ""
     harness_keep_logs: bool = False
-    # "docker" (upstream harness, requires docker daemon) or "singularity"
-    # (uses singularity exec on a cached .sif; for HPC clusters w/o docker).
-    harness_backend: str = "docker"
+    # Only "singularity" is supported (HPC clusters w/o docker).
+    # Field kept for config compatibility; value is ignored.
+    harness_backend: str = "singularity"
     harness_sif_cache_dir: str = ""
 
     @classmethod
@@ -327,11 +327,8 @@ def _evaluate_leaf(
     if not (cfg.evaluate_with_harness and proxy):
         return proxy, proxy, None, "", 0.0, ""
 
-    backend = (cfg.harness_backend or "docker").lower()
-    if backend == "singularity":
-        from mon_agent.evaluate_singularity import evaluate_submission as _eval
-    else:
-        from mon_agent.evaluate import evaluate_submission as _eval
+    from mon_agent.evaluate_singularity import evaluate_submission as _eval
+    backend = "singularity"
 
     safe_node = node_id.replace(".", "_")
     run_id = (
