@@ -7,9 +7,10 @@ runs. It adds:
 - **Per-step logging** (token counts, command type, observation tag,
   repetition / failure-streak signals).
 - **Binary tree search**: every K steps the trajectory snapshots the sandbox
-  and forks into 2 children with fixed temperatures
-  (left T=0.0, right T=0.3). Search continues until any path hits the step
-  budget (default 60) or submits a patch.
+  and forks into 2 children with fixed equal sampling temperatures
+  (left and right both T=0.3 in the current pilot; configurable via
+  `TREE_TEMPERATURE_LEFT` / `TREE_TEMPERATURE_RIGHT`). Search continues
+  until any path hits the step budget (default 60) or submits a patch.
 - **Real SWE-bench evaluation** at every leaf via the official harness — with
   a **Singularity backend** that works on HPC clusters where Docker is not
   available (e.g. UMich Great Lakes).
@@ -158,6 +159,45 @@ prompt_tokens, completion_tokens, prompt_tokens_cum, completion_tokens_cum,
 step_wall_s, context_len_cum, command_type, target_file, returncode,
 exception_flag, output_len, output_elided_chars, obs_tag,
 repeat_cmd_score_recent, repeat_file_score_recent, failure_streak, y`.
+
+See [`feasible_method.md`](feasible_method.md) for the full column dictionary
+and a worked example. A short excerpt below shows the rows we care about
+most — a fork where the two siblings, despite identical parent prefix and
+identical sampling temperature (0.3), diverge sharply in their subtree
+success rate `y`. These mixed-`y` forks (not the `y \in \{0, 1\}` extremes)
+are the primary objects of study.
+
+Real excerpt from
+`results/tree_run_50411867/django__django-11815.steps.csv` (root segment,
+first fork, then the next level down — long rows wrapped for display):
+
+```csv
+instance_id,node_id,depth,temperature,step_idx,prompt_tokens,completion_tokens,prompt_tokens_cum,completion_tokens_cum,step_wall_s,context_len_cum,command_type,target_file,returncode,exception_flag,output_len,output_elided_chars,obs_tag,repeat_cmd_score_recent,repeat_file_score_recent,failure_streak,y
+django__django-11815,0,0,0.3,1,1590,211,1590,211,2.47,6874,read,,0,0,1021,0,success,0.0,0.0,0,0.59375
+django__django-11815,0,0,0.3,2,2180,80,3770,291,1.25,7812,search,,0,0,938,0,success,0.0,0.0,0,0.59375
+django__django-11815,0,0,0.3,10,7271,80,45612,1722,1.65,23103,search,,0,0,652,0,success,0.333,0.0,0,0.59375
+django__django-11815,0.0,1,0.3,11,7534,86,7534,86,1.56,24704,search,/testbed/tests/migrations/test_writer.py,0,0,1601,0,success,0.0,0.0,0,0.375
+django__django-11815,0.1,1,0.3,11,7534,80,7534,80,1.38,24704,search,/testbed/tests/migrations/test_writer.py,0,0,1601,0,success,0.0,0.0,0,0.8125
+django__django-11815,0.0.0,2,0.3,21,11970,498,11970,498,3.6,29408,run,django.conf,1,0,2024,0,exception,0.0,0.0,1,0.25
+django__django-11815,0.0.1,2,0.3,21,11970,491,11970,491,3.64,27883,run,django.conf,0,0,499,0,success,0.0,0.0,0,0.5
+django__django-11815,0.1.0,2,0.3,21,11748,200,11748,200,2.49,28896,run,django.db.migrations.serializer,1,0,380,0,exception,0.0,0.0,1,0.75
+django__django-11815,0.1.1,2,0.3,21,11748,153,11748,153,2.62,28805,run,django.db.migrations.serializer,1,0,289,0,exception,0.0,0.0,1,0.875
+```
+
+Reading the excerpt:
+
+- Root `node_id=0` has `y = 0.59375` — roughly 60% of leaves in its subtree
+  ended up resolving the SWE-bench task.
+- At step 11 the root forks: left child `0.0` collapses to `y = 0.375`,
+  while right child `0.1` is much healthier at `y = 0.8125`. Same prefix,
+  same temperature, ~2× gap in downstream success rate.
+- One level down, the four grandchildren (`0.0.0`, `0.0.1`, `0.1.0`,
+  `0.1.1`) span `y \in \{0.25, 0.5, 0.75, 0.875\}`. Note in particular
+  that `0.1.0` opens with an exception (`returncode=1`,
+  `failure_streak=1`) yet still leads to a `y = 0.75` subtree — local
+  step-level failures do not directly imply doomed prefixes, which is the
+  whole reason we need a prefix-level `Y_k` rather than per-step error
+  counting.
 
 To re-export CSVs from existing trees (e.g. after editing `tree_to_csv.py`):
 

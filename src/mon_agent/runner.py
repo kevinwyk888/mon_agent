@@ -21,7 +21,6 @@ from minisweagent.models import get_model
 from minisweagent.run.benchmarks.swebench import (
     DATASET_MAPPING,
     filter_instances,
-    get_sb_environment,
     remove_from_preds_file,
     update_preds_file,
 )
@@ -32,6 +31,12 @@ from minisweagent.utils.serialize import UNSET, recursive_merge
 from mon_agent.agent import MonitoringAgent
 from mon_agent.tree_search import TreeSearchConfig, run_tree
 from mon_agent.tree_to_csv import convert_one as tree_convert_one
+from mon_agent._singularity_patch import apply_patches as _apply_sing_patches
+from mon_agent._singularity_patch import build_env_for_instance
+
+# Patch mini-SWE-agent's SingularityEnvironment so a failed image build no longer
+# triggers an AttributeError on cleanup (see _singularity_patch for rationale).
+_apply_sing_patches()
 
 DEFAULT_CONFIG_FILE = builtin_config_dir / "benchmarks" / "swebench.yaml"
 
@@ -77,7 +82,7 @@ def process_instance(
     extra_info: dict = {}
 
     try:
-        env = get_sb_environment(config, instance)
+        env = build_env_for_instance(config, instance)
 
         # Set output_path so DefaultAgent.run() saves after EVERY step.
         # This way we don't lose data if SLURM kills the job.

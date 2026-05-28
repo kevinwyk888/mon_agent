@@ -4,7 +4,8 @@
 # What this does
 # --------------
 # 1. Drives a binary-tree search (split every K steps, branching=2, fixed
-#    left-temp=0.0 / right-temp=0.3) on each instance, capped at
+#    left-temp=0.3 / right-temp=0.3 in the current pilot) on each instance,
+#    capped at
 #    --tree-step-budget steps along any root->leaf path.
 # 2. At each leaf evaluates the produced patch with the *real* SWE-bench
 #    harness, using the Singularity backend (no Docker required). The

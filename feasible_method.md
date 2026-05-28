@@ -8,11 +8,14 @@ Build a practical first-stage monitoring system for `mini-swe-agent` on `SWE-ben
 The core idea is:
 
 1. collect **step-level observables** from each agent step,
-2. define a **prefix-level score** \(Y_k\) that estimates future solvability,
-3. monitor the sequence of \(Y_k\) or its increments online,
-4. trigger simple intervention such as **early stop** when persistent degradation is detected.
+2. estimate a **prefix-level score** \(Y_k\) that proxies future solvability via a recursive binary tree of rollouts,
+3. use the per-(node, step) records as the basic dataset for any downstream monitor.
 
-This is intentionally designed as the **simplest viable version** that can be implemented and tested first.
+This document describes the **data-generation pipeline** (already implemented
+in `src/mon_agent/tree_search.py` and `src/mon_agent/runner.py`) and **fixes
+the experimental knobs** that we will hold constant for the first batch of
+runs. How to actually consume the resulting CSVs — feature engineering,
+predictor choice, intervention rule — is intentionally left open below.
 
 ---
 
@@ -45,119 +48,32 @@ Use the following **minimal, practical prefix definition** after step \(k\):
 ### 1. Issue summary
 Always keep:
 
-- original issue / task description
-- optional: task ID and repo name
+- original issue / task description,
+- task ID and repo name.
 
 ### 2. Recent window summary
 Use only the **most recent 3 steps**.
 
 For each recent step, keep a compact step card:
 
-- `action_type`
-- `target_file`
-- `returncode`
-- `obs_tag`
-- `test_delta`
-
-where:
-
-- `action_type` is a coarse category such as `read`, `search`, `edit`, `test`
-- `target_file` is the main file touched by the command
-- `returncode` is command exit status
-- `obs_tag` is a short label such as `success`, `test_fail`, `syntax_error`, `no_new_info`
-- `test_delta` is `improved`, `unchanged`, `worse`, or `NA`
+- `action_type` (`read`, `search`, `edit`, `run`, `test`, `other`),
+- `target_file` (main file touched by the command),
+- `returncode` (command exit status),
+- `obs_tag` (`success`, `exception`, `test_fail`, `syntax_error`, ...),
+- `test_delta` (`improved`, `unchanged`, `worse`, `NA`).
 
 ### 3. Global counters
 Keep only these 6 counters:
 
-- `step_idx`
-- `cost_cum`
-- `context_len_cum`
-- `repeat_cmd_score_recent`
-- `repeat_file_score_recent`
-- `failure_streak`
+- `step_idx`,
+- `cost_cum` (proxied by `prompt_tokens_cum` + `completion_tokens_cum`),
+- `context_len_cum`,
+- `repeat_cmd_score_recent`,
+- `repeat_file_score_recent`,
+- `failure_streak`.
 
-This is the recommended **minimum prefix representation**.
-
----
-
-## Step-Level Signals to Collect
-
-For each step \(k\), log the following minimal set.
-
-### Basic identity
-- `step_idx`
-
-### Cost and context
-- `cost_step`
-- `cost_cum`
-- `context_len_cum`
-
-### Action
-- `command_raw`
-- `command_type`
-- `target_file`
-
-### Repetition
-- `repeat_cmd_score_recent`
-- `repeat_file_score_recent`
-
-### Execution result
-- `returncode`
-- `exception_flag`
-- `output_len`
-
-### Error / progress
-- `obs_tag`
-- `test_delta`
-- `failure_streak`
-
-### Optional semantic score
-- `issue_action_alignment`
-
----
-
-## Recommended Definitions for Key Signals
-
-### `repeat_cmd_score_recent`
-This measures whether the current command is repetitive relative to the recent window.
-
-A practical first implementation:
-
-- window size \(w = 3\)
-- normalize the command string
-- compare with recent commands of the same type
-
-Example:
-
-\[
-\text{repeat\_cmd\_score\_recent}(k)
-=
-\frac{1}{w-1}\sum_{j=k-w}^{k-1} \mathbf{1}(\text{norm}(c_j)=\text{norm}(c_k))
-\]
-
-In the simplest version, use repeated **command type** instead of exact command.
-
-### `repeat_file_score_recent`
-This measures whether the current target file has been repeatedly touched in the recent window.
-
-Simple version:
-
-- extract the main file path from the command,
-- compute the fraction of recent steps that touch the same file.
-
-### `failure_streak`
-This is the number of consecutive failed steps.
-
-Define a step as failed if:
-
-- `returncode != 0`, or
-- `exception_flag == 1`
-
-Then:
-
-- if failed: increment streak by 1
-- else: reset to 0
+All step-level fields are emitted into the per-instance CSV described in
+[Output CSV Format](#output-csv-format).
 
 ---
 
@@ -166,27 +82,46 @@ Then:
 Main definition:
 
 \[
-Y_k := \Pr(\text{eventual success} \mid \text{prefix}_k)
+Y_k := \Pr(\text{eventual success} \mid \text{prefix}_k).
 \]
 
-Interpretation: after step \(k\), how likely is the task still solvable from the current prefix?
+Interpretation: after step \(k\), how likely is the task still solvable from
+the current prefix?
 
 ---
 
 ## How to Estimate Y_k — Recursive Binary Branching
 
-Instead of a flat "main + M independent forks every K steps", we use a **recursive binary tree** of rollouts that share one Singularity sandbox via git snapshot/restore (see `src/mon_agent/tree_search.py`).
+Instead of a flat "main + M independent forks every K steps", we use a
+**recursive binary tree** of rollouts that share one Singularity sandbox via
+`git` snapshot/restore (see `src/mon_agent/tree_search.py`).
 
 ### Tree construction
 
-- Every \(K\) steps the current prefix splits into \(B=2\) children:
-  - **left child**: temperature 0.0 (deterministic baseline),
-  - **right child**: temperature 0.3 (diverse sibling).
+- Every \(K\) steps the current prefix splits into \(B = 2\) children:
+  - **left child**: sampling temperature \(T_L\),
+  - **right child**: sampling temperature \(T_R\).
 - Each child runs \(K\) more steps from the parent's git snapshot, then splits again.
 - Recursion stops on a branch when:
   - the branch terminates (`Submitted` / limits exceeded / exception), or
   - cumulative step count reaches `step_budget` (default 60).
-- Node IDs are dotted paths (`0`, `0.0`, `0.1.0`, ...); the last digit selects left/right and therefore the temperature.
+- Node IDs are dotted paths (`0`, `0.0`, `0.1.0`, ...); the last digit
+  selects left/right and therefore which of \(T_L, T_R\) was used.
+
+### Fixed knob choice for the first batch
+
+For the first generation pass we **freeze** the temperatures:
+
+| knob | value | rationale |
+|------|-------|-----------|
+| \(T_L\) (left, `.0` children) | **0.3** | matches the default already used in `configs/swebench_lite.yaml` and `scripts/run_mc_fork.sbatch` |
+| \(T_R\) (right, `.1` children) | **0.3** | same as \(T_L\); equal-temperature siblings keep \(y\) estimates comparable across branches and avoid temperature being a confound when comparing left/right divergence |
+| `fork_every` (\(K\))           | 10    | already the sbatch default |
+| `step_budget`                  | 60    | already the sbatch default |
+| `fork_cost_budget`             | 5.0   | already the sbatch default |
+
+Asymmetric temperatures (e.g. 0.0 vs 0.3) remain a future ablation but are
+out of scope for the initial dataset.
 
 ### Leaf and internal labels
 
@@ -197,143 +132,210 @@ Instead of a flat "main + M independent forks every K steps", we use a **recursi
 This gives a tree-MC estimate
 
 \[
-\hat Y_k^{\text{tree}}(v) = \text{average leaf success in the subtree rooted at } v.
+\hat Y_k^{\text{tree}}(v) = \text{average leaf success in the subtree rooted at } v
 \]
 
 for every node \(v\) covering steps \([s_v, e_v]\).
 
 ### Per-step Y_k (global view)
 
-For a single instance, we also collapse the tree to a per-step score by averaging over all paths whose prefix contains step \(k\):
+For a single instance we also collapse the tree to a per-step score by
+averaging over all paths whose prefix contains step \(k\):
 
 \[
 Y_k^{\text{global}}
 = \frac{\#\{\text{leaves whose ancestor chain covers step } k \text{ and that succeeded}\}}
-        {\#\{\text{leaves whose ancestor chain covers step } k\}}
+        {\#\{\text{leaves whose ancestor chain covers step } k\}}.
 \]
 
 This is what `results/compute_y_global.py` produces from `<inst>.tree.jsonl`.
 
 ---
 
+## Output CSV Format
+
+The runner writes one CSV per instance into `${CSV_OUT_DIR}` as soon as that
+instance's `tree.json` is on disk (see `mon_agent.tree_to_csv.convert_one`).
+File name: `<instance_id>.steps.csv`. Schema is **one row per (node, step)**
+across the entire tree, so each instance produces on the order of
+(# tree nodes) × (segment length) rows (typically 50–150 rows for the default
+knobs above; large trees can exceed 1k rows when many leaves are explored).
+
+### Column dictionary
+
+| # | column | type | description |
+|---|--------|------|-------------|
+| 1 | `instance_id` | str | SWE-bench task id, e.g. `django__django-11179`. |
+| 2 | `node_id` | str | Dotted tree path. `0` = root, `0.1` = right child of root, `0.1.0` = left child of `0.1`, etc. The last digit picks the sibling (and thus the temperature). |
+| 3 | `depth` | int | Tree depth (= number of dots in `node_id`). |
+| 4 | `temperature` | float | Sampling temperature used for this node's segment (`T_L` or `T_R`). |
+| 5 | `step_idx` | int | 1-based step index along this node's segment (resets at the start of each node). |
+| 6 | `prompt_tokens` | int | Prompt tokens charged on this step. |
+| 7 | `completion_tokens` | int | Completion tokens charged on this step. |
+| 8 | `prompt_tokens_cum` | int | Cumulative prompt tokens **within this node's segment**. |
+| 9 | `completion_tokens_cum` | int | Cumulative completion tokens within this node's segment. |
+| 10 | `step_wall_s` | float | Wall-clock seconds for the step (LLM round-trip + tool exec). |
+| 11 | `context_len_cum` | int | Conversation context length (chars) up to and including this step. |
+| 12 | `command_type` | str | Coarse action tag (`read`, `search`, `edit`, `run`, `other`, ...). |
+| 13 | `target_file` | str | Best-effort main target of the command (file path, module, or symbol). |
+| 14 | `returncode` | int | Tool/exec return code (0 on success). |
+| 15 | `exception_flag` | int | 1 if mini-swe-agent flagged an exception, else 0. |
+| 16 | `output_len` | int | Length (chars) of the observation returned to the model. |
+| 17 | `output_elided_chars` | int | Characters dropped by the observation-truncation rule (0 if not truncated). |
+| 18 | `obs_tag` | str | Short observation label (`success`, `exception`, `test_fail`, ...). |
+| 19 | `repeat_cmd_score_recent` | float | Fraction of the last 3 commands (excluding current) that match the current command. |
+| 20 | `repeat_file_score_recent` | float | Same but on `target_file`. |
+| 21 | `failure_streak` | int | Number of consecutive failed steps ending at this step. |
+| 22 | `y` | float | Subtree success rate for **this node** (constant within a node's rows; equals the leaf success label at leaves). |
+
+Two points worth remembering when consuming the CSV:
+
+- Token / wall-time cumulatives are **per node**, not per path. To recover a
+  root→leaf cumulative, walk `node_id` from the root and sum across
+  segments.
+- `y` is the **node-level** label \(y(v)\) defined above. To get the
+  per-step `Y_k^{global}` use `results/compute_y_global.py` against
+  `<inst>.tree.jsonl`; do not try to recompute it from `steps.csv` directly.
+
+### Example rows
+
+We pick a **mixed-`y`** instance on purpose: trees where every leaf
+succeeds (root `y = 1`) or every leaf fails (root `y = 0`) carry little
+prefix-level signal, and the interesting cases are the ones where sibling
+subtrees disagree under the same fixed temperature. The excerpt below is
+from `results/tree_run_50411867/django__django-11815.steps.csv` (root
+segment + first fork + the four grandchildren at the next fork; long rows
+wrapped for display):
+
+```csv
+instance_id,node_id,depth,temperature,step_idx,prompt_tokens,completion_tokens,prompt_tokens_cum,completion_tokens_cum,step_wall_s,context_len_cum,command_type,target_file,returncode,exception_flag,output_len,output_elided_chars,obs_tag,repeat_cmd_score_recent,repeat_file_score_recent,failure_streak,y
+django__django-11815,0,0,0.3,1,1590,211,1590,211,2.47,6874,read,,0,0,1021,0,success,0.0,0.0,0,0.59375
+django__django-11815,0,0,0.3,2,2180,80,3770,291,1.25,7812,search,,0,0,938,0,success,0.0,0.0,0,0.59375
+django__django-11815,0,0,0.3,3,2543,92,6313,383,1.41,14424,read,/testbed/django/db/migrations/serializer.py,0,0,6612,6415,success,0.5,0.0,0,0.59375
+django__django-11815,0,0,0.3,9,6695,78,38341,1642,1.53,22451,edit,,0,0,1862,0,success,0.333,0.0,0,0.59375
+django__django-11815,0,0,0.3,10,7271,80,45612,1722,1.65,23103,search,,0,0,652,0,success,0.333,0.0,0,0.59375
+django__django-11815,0.0,1,0.3,11,7534,86,7534,86,1.56,24704,search,/testbed/tests/migrations/test_writer.py,0,0,1601,0,success,0.0,0.0,0,0.375
+django__django-11815,0.1,1,0.3,11,7534,80,7534,80,1.38,24704,search,/testbed/tests/migrations/test_writer.py,0,0,1601,0,success,0.0,0.0,0,0.8125
+django__django-11815,0.0,1,0.3,12,8054,840,15588,926,8.20,25104,other,/testbed/django/db/migrations/serializer.py,0,0,400,0,success,0.0,0.0,0,0.375
+django__django-11815,0.1,1,0.3,12,8048,82,15582,162,1.39,26975,other,/testbed/tests/migrations/test_writer.py,0,0,2271,0,success,0.0,1.0,0,0.8125
+django__django-11815,0.0.0,2,0.3,21,11970,498,11970,498,3.60,29408,run,django.conf,1,0,2024,0,exception,0.0,0.0,1,0.25
+django__django-11815,0.0.1,2,0.3,21,11970,491,11970,491,3.64,27883,run,django.conf,0,0,499,0,success,0.0,0.0,0,0.5
+django__django-11815,0.1.0,2,0.3,21,11748,200,11748,200,2.49,28896,run,django.db.migrations.serializer,1,0,380,0,exception,0.0,0.0,1,0.75
+django__django-11815,0.1.1,2,0.3,21,11748,153,11748,153,2.62,28805,run,django.db.migrations.serializer,1,0,289,0,exception,0.0,0.0,1,0.875
+```
+
+What to read out of the example:
+
+- **Root**: `node_id = 0` has `y = 0.59375`. Across the full tree under this
+  prefix, ~60% of leaves resolved the SWE-bench task. This single number
+  averages over everything that happens after step 10, including the very
+  different left/right subtrees below.
+- **First fork (depth 1)**: at step 11 the root splits into `0.0` (`y =
+  0.375`) and `0.1` (`y = 0.8125`). Both children inherit the parent's
+  sandbox via a git snapshot, both are sampled at \(T = 0.3\), and they
+  even open with the same `search` command on the same file — yet their
+  downstream success rates differ by more than 2×. **This is the raw
+  material for any prefix-level monitor**: a per-step classifier that only
+  looks at the row at step 11 sees identical features for the two
+  siblings, so any useful signal must come from richer structure (sibling
+  disagreement, sequence history, calibration to tree statistics).
+- **Second fork (depth 2)**: the four grandchildren span `y ∈ {0.25, 0.5,
+  0.75, 0.875}`. Notice that `0.1.0` opens with an **exception**
+  (`returncode = 1`, `failure_streak = 1`) but still leads to a `y = 0.75`
+  subtree, while `0.0.0` opens with the same kind of exception and ends up
+  at `y = 0.25`. Local step-level failures therefore do not in themselves
+  determine the prefix's solvability — the whole reason we are estimating
+  `Y_k` from the tree rather than counting errors.
+- **Within-node constancy of `y`**: every row of a given node carries the
+  same `y` value (it is a node-level label, not a step-level one). Per-step
+  variation, if needed, has to be reconstructed via `Y_k^{global}` from
+  `<inst>.tree.jsonl`, **not** by aggregating `steps.csv` rows.
+
+---
+
 ## Phased Training Target
 
-1. **Phase 1 (cheap label)**: use eventual success of the original run as a per-prefix label
-   \(\tilde Y_k = \mathbf{1}(\text{run succeeds})\) and fit \(\hat Y_k = f_\theta(\text{prefix}_k)\).
-2. **Phase 2 (tree label)**: replace the label with \(\hat Y_k^{\text{tree}}\) / \(Y_k^{\text{global}}\) computed from the binary tree above.
+1. **Phase 1 (cheap label)**: use eventual success of the original run as a
+   per-prefix label \(\tilde Y_k = \mathbf{1}(\text{run succeeds})\) and fit
+   \(\hat Y_k = f_\theta(\text{prefix}_k)\).
+2. **Phase 2 (tree label)**: replace the label with \(\hat Y_k^{\text{tree}}\)
+   / \(Y_k^{\text{global}}\) computed from the binary tree above.
 
-Start from Phase 1; switch to Phase 2 once a small batch of trees is collected. Do **not** start from degradation-risk labels — they are much harder to define cleanly.
-
----
-
-## Recommended Model for Y_k
-
-Start with a lightweight tabular or shallow model:
-
-- logistic regression
-- XGBoost
-- small MLP
-
-Input:
-- structured prefix features only
-
-Do **not** start with a full-text large model predictor in the first stage.
-
-The purpose of the pilot is to validate whether the chosen observables contain useful information.
+Start from Phase 1; switch to Phase 2 once a small batch of trees is
+collected. Do **not** start from degradation-risk labels — they are much
+harder to define cleanly.
 
 ---
 
-## Online Monitoring Strategy
+## Downstream Use of `steps.csv` — TBD
 
-Do not start with residual modeling.
+Intentionally left open for now. The dataset described above is the input;
+the question of **what model / monitor consumes it** is unresolved. A few
+non-binding observations to keep in mind when we come back to this:
 
-Use one of these directly:
+- The feature set is small (≤ 20 numeric / categorical columns) and the
+  cross-instance variance dominates within-instance variance, so naïve
+  per-step classifiers (logistic regression, shallow XGBoost) on raw rows
+  are expected to **mostly memorize instance-level priors** rather than
+  detect prefix-level degradation.
+- Useful structure that simple tabular learners do not capture out of the
+  box:
+  - sequential dependence (`failure_streak`, repeat scores already encode a
+    little, but the full step sequence carries more),
+  - tree topology and sibling-divergence signals (left vs right `y` gap at
+    the same fork),
+  - cross-instance normalization (token / context counters are not
+    comparable across repos without it).
+- A reasonable order of attempts, when we get to it, is roughly:
+  sequence model over a single trajectory → per-fork sibling-disagreement
+  features → calibration of the per-step prediction against the
+  tree-derived \(Y_k^{global}\). None of this is committed; this section is
+  a placeholder.
 
-### Option A: monitor \(\hat Y_k\)
-If \(\hat Y_k\) stays low for several steps, flag degradation.
-
-### Option B: monitor progress increments
-Define:
-
-\[
-\Delta_k = \hat Y_k - \hat Y_{k-1}
-\]
-
-Interpretation:
-- positive: progress
-- near zero: stagnation
-- negative: degradation
-
-This is highly interpretable.
-
-### Option C: simple CUSUM on \(\Delta_k\)
-Define:
-
-\[
-S_k = \max\{0, S_{k-1} + (c - \Delta_k)\}
-\]
-
-If \(S_k\) exceeds a threshold, trigger intervention.
-
-This helps distinguish persistent degradation from one noisy bad step.
-
----
-
-## Recommended First Intervention
-
-Use only **early stop** in the first stage.
-
-Reason:
-- easiest to implement,
-- easiest to evaluate,
-- directly measures whether the monitor avoids wasting steps and cost on obviously bad trajectories.
-
-Later, a second intervention can be added:
-- replan once,
-- or compress / reset context.
+The intervention rule (early stop, replan, etc.) and the success criteria
+for the monitor are likewise deferred until we have a candidate predictor.
 
 ---
 
 ## Recommended Experiment Sequence
 
-### Stage 1
-Run `mini-swe-agent` on a small subset of `SWE-bench Lite` with the **binary tree runner** (`tree_search.py`) and collect, per instance:
-- `<inst>.steps.jsonl` (per-step features for every node),
+### Stage 1 — data generation (this is what the current pipeline does)
+Run `mini-swe-agent` on `SWE-bench Lite` with the binary tree runner
+(`tree_search.py`) under the fixed knobs above and collect, per instance:
+- `<inst>.steps.csv` (the table specified in
+  [Output CSV Format](#output-csv-format)),
+- `<inst>.steps.jsonl` (the same content in JSONL, slightly richer),
 - `<inst>.tree.json` / `<inst>.tree.jsonl` (full tree with `y`, `success`).
 
-### Stage 2
-Flatten trees into prefix samples and train a cheap \(\hat Y_k\) predictor, first against eventual-success labels, then against tree labels \(\hat Y_k^{\text{tree}}\) / \(Y_k^{\text{global}}\).
+### Stage 2 — data inspection
+Sanity-check distributions of the step-level signals (`repeat_*`,
+`failure_streak`, `obs_tag`, `command_type`) across successful vs failing
+subtrees. Confirm that `y` propagates correctly and that token counters are
+non-decreasing within a node.
 
-### Stage 3
-Check whether \(\hat Y_k\) or \(\Delta_k\) correlates with hidden degradation patterns such as repeated command/file loops, persistent execution failures, or long context growth with no test improvement — and whether **left/right sibling divergence** in \(y\) flags risky prefixes early.
+### Stage 3 — predictor / monitor design
+**Deferred** — see the TBD section above.
 
-### Stage 4
-Add a simple monitoring rule and compare:
-- baseline (single trajectory),
-- monitor-only,
-- monitor + early stop,
-- monitor + branch-pruning inside the tree (drop low-\(y\) subtrees early to save budget).
-
----
-
-## Success Criteria for the Pilot
-
-The pilot is successful if at least one of the following is true:
-
-1. \(\hat Y_k\) clearly separates successful and failing prefixes.
-2. \(\Delta_k\) becomes persistently negative before terminal failure.
-3. early stop reduces wasted steps / cost on bad runs.
-4. the monitor provides interpretable evidence of hidden degradation.
+### Stage 4 — intervention evaluation
+**Deferred** — depends on Stage 3.
 
 ---
 
 ## Short Summary
 
-The most feasible method is:
+The most feasible **data-generation** method, which is what we commit to in
+this document, is:
 
-1. define a compact prefix from issue + recent 3-step window + 6 global counters,
-2. estimate \(Y_k\) by a **recursive binary-branching tree** (B=2, temperatures 0.0 / 0.3, split every K steps, capped by `step_budget`), with leaf success from harness or `Submitted` proxy and internal nodes = mean of children,
-3. train \(\hat Y_k = f_\theta(\text{prefix}_k)\) against the tree labels (or eventual-success labels as a Phase-1 shortcut),
-4. monitor \(\hat Y_k\) or \(\Delta_k\) online and start with early stop as the first intervention.
+1. define a compact prefix from issue + recent 3-step window + 6 global
+   counters,
+2. estimate \(Y_k\) by a **recursive binary tree** of rollouts with
+   \(B = 2\), **fixed equal temperatures** \(T_L = T_R = 0.3\), split every
+   \(K = 10\) steps, capped by `step_budget = 60`, with leaf success from
+   the SWE-bench harness (or `Submitted` proxy as fallback) and internal
+   nodes set to the mean of their children,
+3. dump every (node, step) into a per-instance CSV with the schema in
+   [Output CSV Format](#output-csv-format).
 
-This is the cleanest first implementation on `mini-swe-agent`.
+What we do with those CSVs — predictor architecture, monitoring rule,
+intervention — is **deliberately left open** in this version of the
+document.
