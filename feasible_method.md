@@ -186,7 +186,8 @@ knobs above; large trees can exceed 1k rows when many leaves are explored).
 | 19 | `repeat_cmd_score_recent` | float | Fraction of the last 3 commands (excluding current) that match the current command. |
 | 20 | `repeat_file_score_recent` | float | Same but on `target_file`. |
 | 21 | `failure_streak` | int | Number of consecutive failed steps ending at this step. |
-| 22 | `y` | float | Subtree success rate for **this node** (constant within a node's rows; equals the leaf success label at leaves). |
+| 22 | `confidence` | float | Self-reported confidence in `[0, 1]` that the action just taken was a correct, helpful step toward solving the task. Produced by a separate one-shot LLM probe (system + user prompt, max 256 tokens, up to 2 attempts) called immediately after the step finishes. `NaN` when both attempts fail to emit a parseable number. Probe cost is added to the agent's running `cost` total. |
+| 23 | `y` | float | Subtree success rate for **this node** (constant within a node's rows; equals the leaf success label at leaves). |
 
 Two points worth remembering when consuming the CSV:
 
@@ -198,6 +199,11 @@ Two points worth remembering when consuming the CSV:
   `<inst>.tree.jsonl`; do not try to recompute it from `steps.csv` directly.
 
 ### Example rows
+
+> Note: the excerpt below comes from `results/tree_run_50411867/`, which
+> predates the `confidence` column. Newer runs (e.g. `tree_run_51265704`
+> and later) include `confidence` as the second-to-last column, just
+> before `y`.
 
 We pick a **mixed-`y`** instance on purpose: trees where every leaf
 succeeds (root `y = 1`) or every leaf fails (root `y = 0`) carry little
@@ -273,7 +279,7 @@ Intentionally left open for now. The dataset described above is the input;
 the question of **what model / monitor consumes it** is unresolved. A few
 non-binding observations to keep in mind when we come back to this:
 
-- The feature set is small (≤ 20 numeric / categorical columns) and the
+- The feature set is small (≤ 21 numeric / categorical columns) and the
   cross-instance variance dominates within-instance variance, so naïve
   per-step classifiers (logistic regression, shallow XGBoost) on raw rows
   are expected to **mostly memorize instance-level priors** rather than

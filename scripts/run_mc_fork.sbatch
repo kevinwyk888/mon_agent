@@ -38,7 +38,7 @@
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=96G
-#SBATCH --time=72:00:00
+#SBATCH --time=96:00:00
 #SBATCH --output=logs/slurm-%j.out
 #SBATCH --error=logs/slurm-%j.err
 # #SBATCH --mail-type=BEGIN,END,FAIL
@@ -105,8 +105,8 @@ export MODEL="${MODEL:-openai/deepseek-v4-flash}"
 export WORKERS="${WORKERS:-8}"
 export SIF_CACHE="${SIF_CACHE:-${SCRATCH_BASE}/swebench_sif}"
 
-export TREE_FORK_EVERY="${TREE_FORK_EVERY:-10}"
-export TREE_STEP_BUDGET="${TREE_STEP_BUDGET:-60}"
+export TREE_FORK_EVERY="${TREE_FORK_EVERY:-8}"
+export TREE_STEP_BUDGET="${TREE_STEP_BUDGET:-64}"
 export TREE_FORK_COST_BUDGET="${TREE_FORK_COST_BUDGET:-5.0}"
 export TREE_SNAPSHOT_CWD="${TREE_SNAPSHOT_CWD:-/testbed}"
 export TREE_TEMPERATURE_LEFT="${TREE_TEMPERATURE_LEFT:-0.3}"

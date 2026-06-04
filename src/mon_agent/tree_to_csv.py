@@ -33,6 +33,7 @@ COLUMNS = [
     "repeat_cmd_score_recent",
     "repeat_file_score_recent",
     "failure_streak",
+    "confidence",
     "y",
 ]
 

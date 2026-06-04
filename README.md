@@ -5,7 +5,8 @@
 runs. It adds:
 
 - **Per-step logging** (token counts, command type, observation tag,
-  repetition / failure-streak signals).
+  repetition / failure-streak signals, plus a self-reported `confidence`
+  in `[0, 1]` from a small one-shot LLM probe asked right after each step).
 - **Binary tree search**: every K steps the trajectory snapshots the sandbox
   and forks into 2 children with fixed equal sampling temperatures
   (left and right both T=0.3 in the current pilot; configurable via
@@ -158,7 +159,10 @@ CSV columns: `instance_id, node_id, depth, temperature, step_idx,
 prompt_tokens, completion_tokens, prompt_tokens_cum, completion_tokens_cum,
 step_wall_s, context_len_cum, command_type, target_file, returncode,
 exception_flag, output_len, output_elided_chars, obs_tag,
-repeat_cmd_score_recent, repeat_file_score_recent, failure_streak, y`.
+repeat_cmd_score_recent, repeat_file_score_recent, failure_streak,
+confidence, y`. The `confidence` column holds the LLM probe's
+self-reported score in `[0, 1]`, or `NaN` if the probe failed both of its
+two attempts to emit a parseable number.
 
 See [`feasible_method.md`](feasible_method.md) for the full column dictionary
 and a worked example. A short excerpt below shows the rows we care about
@@ -169,7 +173,9 @@ are the primary objects of study.
 
 Real excerpt from
 `results/tree_run_50411867/django__django-11815.steps.csv` (root segment,
-first fork, then the next level down — long rows wrapped for display):
+first fork, then the next level down — long rows wrapped for display).
+This run predates the `confidence` column; newer runs include it as the
+second-to-last column, just before `y`.
 
 ```csv
 instance_id,node_id,depth,temperature,step_idx,prompt_tokens,completion_tokens,prompt_tokens_cum,completion_tokens_cum,step_wall_s,context_len_cum,command_type,target_file,returncode,exception_flag,output_len,output_elided_chars,obs_tag,repeat_cmd_score_recent,repeat_file_score_recent,failure_streak,y

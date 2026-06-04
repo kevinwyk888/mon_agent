@@ -32,6 +32,23 @@ RECURSIVE_LS_RE = re.compile(
 FIND_ROOT_RE = re.compile(r"(^|[;&|]\s*)find\s+(\.|/testbed)(\s|$)")
 SELECTIVE_FIND_RE = re.compile(r"\s-(name|iname|regex)\s+", re.IGNORECASE)
 
+CONFIDENCE_SYSTEM = (
+    "You are a calibration assistant. The user will describe the most recent action "
+    "an autonomous coding agent took while solving a software-engineering task, "
+    "together with the observed result. Estimate the probability (a single number "
+    "between 0 and 1) that this action was a correct and helpful step toward "
+    "solving the task. Think briefly (strictly <100 tokens). "
+    "Output ONLY the number — no words, no units, no explanation."
+)
+CONFIDENCE_USER_TEMPLATE = (
+    "Task (truncated):\n{task}\n\n"
+    "Most recent action (command):\n{command}\n\n"
+    "Observation (truncated):\n{observation}\n\n"
+    "Your confidence (0 to 1):"
+)
+CONFIDENCE_RE = re.compile(r"(?<![\w.])(0(?:\.\d+)?|1(?:\.0+)?|\.\d+)(?!\d)")
+
+
 GUARD_MESSAGE = """Command blocked before execution because it is likely to produce a very large observation and exhaust the model context.
 
 Use a bounded command instead. Examples:
@@ -320,10 +337,120 @@ class MonitoringAgent(DefaultAgent):
             "repeat_cmd_score_recent": round(rep_cmd, 3),
             "repeat_file_score_recent": round(rep_file, 3),
             "failure_streak": self._failure_streak,
+            "confidence": self._query_confidence(command_raw, output_text),
         }
 
         self.step_logs.append(record)
         logger.info("Step %d: %s | %s | rc=%d | %s", step_idx, command_type, obs_tag, returncode, target_file)
+
+    # ------------------------------------------------------------------
+    # Self-reported confidence
+    # ------------------------------------------------------------------
+
+    def _query_confidence(self, command: str, observation: str) -> float:
+        """Ask the underlying LLM to self-report confidence in the last step.
+
+        Retries up to 2 times if the model fails to emit a parseable number;
+        if all retries fail, returns ``NaN``. Cost of every attempt is added
+        to ``self.cost``.
+
+        Runs for every step including segment agents (``is_fork=True``).
+        """
+        model_name = getattr(getattr(self.model, "config", None), "model_name", None)
+        if not model_name:
+            logger.info("confidence query: no model_name on self.model.config")
+            return float("nan")
+
+        # Truncate to keep the probe cheap and bounded.
+        task = (self._task_text or "")[:1500]
+        cmd = (command or "(no command)")[:1000]
+        obs = (observation or "")
+        if len(obs) > 1500:
+            obs = obs[:750] + "\n... [elided] ...\n" + obs[-750:]
+
+        try:
+            import litellm  # type: ignore
+        except Exception:  # pragma: no cover
+            return float("nan")
+
+        model_kwargs = dict(getattr(self.model.config, "model_kwargs", {}) or {})
+        # Strip tool-related kwargs so the model is free to return plain text.
+        for k in ("tools", "tool_choice", "parallel_tool_calls"):
+            model_kwargs.pop(k, None)
+        # First attempt deterministic; subsequent retries warm up temperature
+        # so the model is less likely to repeat the exact same failure mode.
+        base_kwargs = dict(model_kwargs)
+        base_kwargs["max_tokens"] = 256
+
+        messages = [
+            {"role": "system", "content": CONFIDENCE_SYSTEM},
+            {
+                "role": "user",
+                "content": CONFIDENCE_USER_TEMPLATE.format(
+                    task=task, command=cmd, observation=obs
+                ),
+            },
+        ]
+
+        max_attempts = 2
+        for attempt in range(1, max_attempts + 1):
+            attempt_kwargs = dict(base_kwargs)
+            attempt_kwargs["temperature"] = 0.0 if attempt == 1 else 0.7
+            try:
+                response = litellm.completion(
+                    model=model_name, messages=messages, **attempt_kwargs
+                )
+            except Exception as e:
+                logger.info(
+                    "confidence query attempt %d/%d failed: %s",
+                    attempt, max_attempts, e,
+                )
+                continue
+
+            # Cost accounting (best-effort).
+            try:
+                cost = litellm.cost_calculator.completion_cost(
+                    response, model=model_name
+                )
+                if cost and cost > 0:
+                    self.cost += float(cost)
+            except Exception:
+                pass
+
+            try:
+                choice = response.choices[0]
+                msg = choice.message
+                content = (getattr(msg, "content", None) or "") or ""
+                # Fall back to reasoning_content (DeepSeek-R1, o1-style providers).
+                if not content.strip():
+                    content = getattr(msg, "reasoning_content", "") or ""
+                finish_reason = getattr(choice, "finish_reason", "")
+            except Exception as e:
+                logger.info(
+                    "confidence query attempt %d/%d: failed to read response: %s",
+                    attempt, max_attempts, e,
+                )
+                continue
+
+            match = CONFIDENCE_RE.search(content)
+            if not match:
+                logger.info(
+                    "confidence query attempt %d/%d: no number parsed "
+                    "(finish=%s, len=%d) from %r",
+                    attempt, max_attempts, finish_reason, len(content),
+                    content[:200],
+                )
+                continue
+            try:
+                val = float(match.group(1))
+            except ValueError:
+                continue
+            if val < 0.0 or val > 1.0:
+                continue
+            return round(val, 4)
+
+        logger.info("confidence query: all %d attempts failed, returning NaN", max_attempts)
+        return float("nan")
 
     # ------------------------------------------------------------------
     # Prefix access

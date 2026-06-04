@@ -130,6 +130,9 @@ runner_args=(
   --tree-temperature-left "${TREE_TEMPERATURE_LEFT}"
   --tree-temperature-right "${TREE_TEMPERATURE_RIGHT}"
 )
+if [[ -n "${FILTER:-}" ]]; then
+  runner_args+=( --filter "${FILTER}" )
+fi
 if [[ "${EVAL_HARNESS}" == "1" ]]; then
   runner_args+=(
     --tree-eval-harness
