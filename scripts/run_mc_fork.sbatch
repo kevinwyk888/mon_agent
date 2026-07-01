@@ -38,7 +38,7 @@
 #SBATCH --gpus=1
 #SBATCH --cpus-per-task=16
 #SBATCH --mem=96G
-#SBATCH --time=96:00:00
+#SBATCH --time=144:00:00
 #SBATCH --output=logs/slurm-%j.out
 #SBATCH --error=logs/slurm-%j.err
 # #SBATCH --mail-type=BEGIN,END,FAIL
@@ -92,9 +92,9 @@ export CONFIG="${CONFIG:-configs/swebench_lite.yaml}"
 #   lite      = princeton-nlp/SWE-Bench_Lite      (300 short-patch tasks)
 #   verified  = princeton-nlp/SWE-Bench_Verified  (500 human-vetted tasks)
 #   full      = princeton-nlp/SWE-Bench           (2294 tasks)
-export SUBSET="${SUBSET:-lite}"
+export SUBSET="${SUBSET:-verified}"
 export SPLIT="${SPLIT:-test}"
-export SLICE="${SLICE:-0:300}"
+export SLICE="${SLICE:-0:500}"
 # Override the model defined in CONFIG. Common values:
 #   openai/deepseek-v4-pro    (strong, default)
 #   openai/deepseek-v4-flash  (lightweight distilled, more diversity)
