@@ -1,0 +1,103 @@
+{
+  "config": {
+    "data_dir": "/mnt/d/Filez/Desktop/Research/raed/test/tree_run_51284821",
+    "stride": 8,
+    "min_step": 9,
+    "pure_val_ratio": 0.5,
+    "seed": 7,
+    "calibration_learning_rate": 0.1,
+    "calibration_epochs": 400,
+    "calibration_l2": 0.001
+  },
+  "counts": {
+    "num_instances": 221,
+    "mixed_train_files": 70,
+    "val_pure_files": 75,
+    "test_pure_files": 76,
+    "train_samples": 21151,
+    "val_samples": 12468,
+    "test_samples": 10937
+  },
+  "signal_summary": {
+    "impute_value": 0.6637751467990644,
+    "train_missing_rate": 0.0096449340456716,
+    "val_missing_rate": 0.012191209496310555,
+    "test_missing_rate": 0.012800585169607753,
+    "train_confidence_mean": 0.6637751467990644,
+    "val_confidence_mean": 0.6707325811929306,
+    "test_confidence_mean": 0.664373824682442
+  },
+  "threshold": {
+    "threshold": 0.630253,
+    "balanced_accuracy": 0.5738731105767116,
+    "f1": 0.7274224540214109,
+    "precision": 0.8970886932972241,
+    "recall": 0.6117266851338874,
+    "specificity": 0.536019536019536
+  },
+  "success_probability_threshold": 0.36974700000000005,
+  "calibrator": {
+    "scale": 0.5801555418319306,
+    "bias": -1.055443903361085,
+    "best_loss": 0.6360211442427708
+  },
+  "metrics": {
+    "train_soft_target": {
+      "row_bce": 0.6358528540164117,
+      "y_mean": 0.34018190629284667,
+      "pred_mean": 0.3401819068953888
+    },
+    "val_pure": {
+      "accuracy": 0.6017805582290664,
+      "balanced_accuracy": 0.5738731105767116,
+      "precision": 0.8970886932972241,
+      "recall": 0.6117266851338874,
+      "specificity": 0.536019536019536,
+      "f1": 0.7274224540214109,
+      "roc_auc": 0.5653439153439154,
+      "average_precision": 0.876443729023581,
+      "brier": 0.15928215359672845,
+      "log_loss": 0.5050583158988615,
+      "alarm_rate": 0.592316329804299,
+      "tp": 6625.0,
+      "tn": 878.0,
+      "fp": 760.0,
+      "fn": 4205.0
+    },
+    "test_pure": {
+      "accuracy": 0.5870896955289384,
+      "balanced_accuracy": 0.5557227572832037,
+      "precision": 0.8972270092433026,
+      "recall": 0.5973714404923334,
+      "specificity": 0.5140740740740741,
+      "f1": 0.717219787100814,
+      "roc_auc": 0.5563742181735297,
+      "average_precision": 0.8861871458250254,
+      "brier": 0.15638362492900143,
+      "log_loss": 0.4988205659990838,
+      "alarm_rate": 0.5836152509829021,
+      "tp": 5727.0,
+      "tn": 694.0,
+      "fp": 656.0,
+      "fn": 3860.0
+    },
+    "val_leaf_alarm": {
+      "pure0_leaf_alarm_recall": 0.9992782389029231,
+      "pure1_leaf_false_alarm_rate": 0.9847494553376906,
+      "pure0_leaf_alarm_median_step": 9.0,
+      "pure1_leaf_false_alarm_median_step": 16.0,
+      "pure0_leaf_paths": 2771.0,
+      "pure1_leaf_paths": 459.0,
+      "pure0_successful_warning_mean_early_pct": 80.33261448279491
+    },
+    "test_leaf_alarm": {
+      "pure0_leaf_alarm_recall": 0.9979740680713128,
+      "pure1_leaf_false_alarm_rate": 0.9562982005141388,
+      "pure0_leaf_alarm_median_step": 9.0,
+      "pure1_leaf_false_alarm_median_step": 16.0,
+      "pure0_leaf_paths": 2468.0,
+      "pure1_leaf_paths": 389.0,
+      "pure0_successful_warning_mean_early_pct": 77.3771495333651
+    }
+  }
+}

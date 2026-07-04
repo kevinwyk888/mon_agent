@@ -1,0 +1,82 @@
+[
+  {
+    "feature": "win__cmd_frac__diff",
+    "weight": 0.3205537411830962
+  },
+  {
+    "feature": "win__cmd_frac__test",
+    "weight": 0.302123402106377
+  },
+  {
+    "feature": "win__target_missing__mean",
+    "weight": -0.2935189403192598
+  },
+  {
+    "feature": "win__repeat_cmd_score_recent__mean",
+    "weight": -0.2738389725594429
+  },
+  {
+    "feature": "win__cmd_frac__read",
+    "weight": -0.25768053216829756
+  },
+  {
+    "feature": "win__command_switch_ratio",
+    "weight": -0.2565153507332488
+  },
+  {
+    "feature": "cur__prompt_tokens_cum",
+    "weight": -0.2491240447775676
+  },
+  {
+    "feature": "win__cmd_frac__other",
+    "weight": -0.24510055933230457
+  },
+  {
+    "feature": "cur__cmd__edit",
+    "weight": 0.23326369426732338
+  },
+  {
+    "feature": "win__consecutive_same_target_ratio",
+    "weight": -0.21502116289131923
+  },
+  {
+    "feature": "win__output_len__mean",
+    "weight": 0.2135557801818083
+  },
+  {
+    "feature": "win__context_len_cum__mean",
+    "weight": -0.20198033975048904
+  },
+  {
+    "feature": "win__output_len__max",
+    "weight": -0.16855579077628616
+  },
+  {
+    "feature": "cur__step_idx",
+    "weight": -0.16527312943652375
+  },
+  {
+    "feature": "window_len",
+    "weight": -0.16495656054512461
+  },
+  {
+    "feature": "window_fill_ratio",
+    "weight": -0.16495656054512461
+  },
+  {
+    "feature": "cur__cmd__read",
+    "weight": -0.16493817834471097
+  },
+  {
+    "feature": "cur__target_is_abs_like",
+    "weight": -0.16023843727129305
+  },
+  {
+    "feature": "win__prompt_tokens__mean",
+    "weight": -0.15181500431816125
+  },
+  {
+    "feature": "cur__completion_tokens_cum",
+    "weight": 0.1489518841614115
+  }
+]

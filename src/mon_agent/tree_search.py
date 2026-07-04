@@ -153,6 +153,10 @@ class TreeNode:
     wall_s: float = 0.0
     temperature: float = 0.0
     """Sampling temperature used to roll this segment out (0.0 left, 0.3 right)."""
+    alarm_events: list[dict] = field(default_factory=list)
+    """Per-step alarm monitor records emitted during this segment (may be empty)."""
+    n_interventions: int = 0
+    """Deprecated intervention count field kept for tree-CSV compatibility."""
 
     # ------------------------------------------------------------------
     # Serialization
@@ -197,6 +201,7 @@ class TreeNode:
             "wall_s": round(self.wall_s, 2),
             "temperature": self.temperature,
             "error": self.error,
+            "n_interventions": self.n_interventions,
             "features": self.step_logs,
         }
 
@@ -230,6 +235,10 @@ def _make_segment_agent(
     step_limit: int,
     cost_limit: float,
     instance_id: str,
+    node_id: str = "0",
+    depth: int = 0,
+    temperature: float = 0.0,
+    path_prefix_logs: list[dict] | None = None,
 ) -> "MonitoringAgent":
     """Build a MonitoringAgent that resumes from (parent_messages, parent_n_calls)."""
     from mon_agent.agent import MonitoringAgent  # local import to avoid cycles
@@ -256,6 +265,11 @@ def _make_segment_agent(
     seg.extra_template_vars.setdefault(
         "task", getattr(template_agent, "_task_text", "")
     )
+    # Node context + ancestor prefix so the alarm monitor sees the full path.
+    seg._node_id = node_id
+    seg._node_depth = depth
+    seg._node_temperature = temperature
+    seg._path_prefix_logs = list(path_prefix_logs or [])
     return seg
 
 
@@ -393,9 +407,11 @@ def _expand_node(
     depth: int,
     model_name: str,
     progress_cb: Callable[[str, "MonitoringAgent"], None] | None = None,
+    path_prefix_logs: list[dict] | None = None,
 ) -> TreeNode:
     """Run one segment from a snapshot; recurse if it ends at a split point."""
     t0 = time.monotonic()
+    path_prefix_logs = list(path_prefix_logs or [])
 
     # Restore env to snapshot before running this segment.
     try:
@@ -434,6 +450,10 @@ def _expand_node(
         step_limit=next_split,
         cost_limit=parent_cost + cfg.fork_cost_budget,
         instance_id=instance_id,
+        node_id=node_id,
+        depth=depth,
+        temperature=_temperature_for(node_id, cfg),
+        path_prefix_logs=path_prefix_logs,
     )
 
     terminated, exit_status, submission, error_str = _drive_until_split(
@@ -457,6 +477,8 @@ def _expand_node(
         cost=max(0.0, seg.cost - parent_cost),
         wall_s=round(time.monotonic() - t0, 2),
         temperature=_temperature_for(node_id, cfg),
+        alarm_events=list(getattr(seg, "_alarm_events", [])),
+        n_interventions=0,
     )
 
     # ------------------------------------------------------------------
@@ -521,6 +543,9 @@ def _expand_node(
     child_messages = _strip_trailing_exit(seg.messages)
     child_n_calls = seg.n_calls
     child_cost = seg.cost
+    # Children inherit this segment's steps so the alarm monitor scores the
+    # full root->node prefix window, not just their own local segment.
+    child_prefix_logs = path_prefix_logs + list(seg.step_logs)
 
     for b in range(_BRANCHING):
         child_id = f"{node_id}.{b}"
@@ -537,6 +562,7 @@ def _expand_node(
             depth=depth + 1,
             model_name=model_name,
             progress_cb=progress_cb,
+            path_prefix_logs=child_prefix_logs,
         )
         node.children.append(child)
 
@@ -648,9 +674,10 @@ def run_tree(
     n_nodes = sum(1 for _ in root.iter_flat())
     n_leaves = sum(1 for n, _ in root.iter_flat() if not n.children)
     n_success = sum(1 for n, _ in root.iter_flat() if not n.children and n.success)
+    n_interventions = sum(n.n_interventions for n, _ in root.iter_flat())
     logger.info(
-        "Tree done: nodes=%d leaves=%d success=%d y_root=%.4f wall=%.1fs",
-        n_nodes, n_leaves, n_success, root.y, total_wall,
+        "Tree done: nodes=%d leaves=%d success=%d y_root=%.4f interventions=%d wall=%.1fs",
+        n_nodes, n_leaves, n_success, root.y, n_interventions, total_wall,
     )
 
     if output_dir is not None:
@@ -666,6 +693,7 @@ def run_tree(
                         "n_nodes": n_nodes,
                         "n_leaves": n_leaves,
                         "n_success": n_success,
+                        "n_interventions": n_interventions,
                         "y_root": round(root.y, 4),
                         "wall_s": total_wall,
                         "snapshot_sha": root_sha,
@@ -686,6 +714,7 @@ def run_tree(
         "tree_y_root": root.y,
         "tree_n_leaves": n_leaves,
         "tree_n_success": n_success,
+        "tree_n_interventions": n_interventions,
         "tree_picked_node": picked_id,
     }
     return root, info

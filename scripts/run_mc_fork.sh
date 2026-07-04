@@ -141,7 +141,6 @@ if [[ "${EVAL_HARNESS}" == "1" ]]; then
     --mc-eval-timeout-s "${EVAL_TIMEOUT_S}"
   )
 fi
-
 echo "[$(date -Iseconds)] mon-agent-runner ${runner_args[*]}"
 mon-agent-runner "${runner_args[@]}"
 
@@ -163,9 +162,10 @@ find "${CSV_OUT_DIR}" -maxdepth 1 -type f -name '*.steps.csv' | sort
 
 echo
 echo "Per-instance y_root summary:"
-python3 - <<PY
+OUTPUT_DIR="${OUTPUT_DIR}" python3 - <<'PY'
 import json, glob, os
-for p in sorted(glob.glob("${OUTPUT_DIR}/*/*.tree.json")):
+output_dir = os.environ["OUTPUT_DIR"]
+for p in sorted(glob.glob(f"{output_dir}/*/*.tree.json")):
     try:
         d = json.load(open(p))
         s = d.get("stats", {})

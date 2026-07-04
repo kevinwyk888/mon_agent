@@ -25,6 +25,7 @@ Repository = "https://github.com/Bradley-Zhu/mon-agent"
 
 [project.scripts]
 mon-agent-runner = "mon_agent.runner:app"
+mon-agent-retry-runner = "mon_agent.retry_runner:main"
 
 [tool.setuptools]
 include-package-data = true

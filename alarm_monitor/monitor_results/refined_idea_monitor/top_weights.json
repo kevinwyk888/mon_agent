@@ -1,0 +1,82 @@
+[
+  {
+    "feature": "win__confidence__mean",
+    "weight": 0.9780712623874364
+  },
+  {
+    "feature": "win__confidence__std",
+    "weight": 0.6861598905737117
+  },
+  {
+    "feature": "cur__target_has_value",
+    "weight": 0.5177688067865343
+  },
+  {
+    "feature": "win__context_len_cum__std",
+    "weight": -0.5032598453775037
+  },
+  {
+    "feature": "win__cmd_frac__diff",
+    "weight": 0.4834889554907746
+  },
+  {
+    "feature": "win__target_missing__delta",
+    "weight": 0.4586334089804074
+  },
+  {
+    "feature": "win__target_missing__mean",
+    "weight": -0.4301368698832122
+  },
+  {
+    "feature": "win__step_wall_s__std",
+    "weight": -0.42575988444280544
+  },
+  {
+    "feature": "win__completion_tokens__mean",
+    "weight": -0.4160153265697313
+  },
+  {
+    "feature": "win__output_len__delta",
+    "weight": 0.41035399389282945
+  },
+  {
+    "feature": "cur__prompt_tokens_cum",
+    "weight": -0.40936787395811375
+  },
+  {
+    "feature": "win__unique_target_ratio",
+    "weight": -0.3885530443142783
+  },
+  {
+    "feature": "win__step_wall_s__max",
+    "weight": 0.3828502755761203
+  },
+  {
+    "feature": "win__prompt_tokens__std",
+    "weight": 0.37501102427678373
+  },
+  {
+    "feature": "cur__prompt_tokens",
+    "weight": -0.34248869474403615
+  },
+  {
+    "feature": "win__prompt_tokens__max",
+    "weight": -0.34248869474403615
+  },
+  {
+    "feature": "win__prompt_tokens__last",
+    "weight": -0.34248869474403537
+  },
+  {
+    "feature": "win__prompt_tokens__delta",
+    "weight": -0.33751188704737495
+  },
+  {
+    "feature": "win__context_len_cum__delta",
+    "weight": 0.3372280851845653
+  },
+  {
+    "feature": "win__cmd_frac__test",
+    "weight": 0.3299478206858877
+  }
+]

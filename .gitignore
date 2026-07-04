@@ -26,5 +26,7 @@ slides/*.snm
 slides/*.toc
 slides/*.pdf
 
+alarm_monitor/data/*.csv
+
 *.swp
 *.swo

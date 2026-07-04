@@ -97,6 +97,14 @@ class MonitoringAgent(DefaultAgent):
             self._mc_cfg = MCForkConfig.from_dict(mc_config)
         self.mc_results: list[dict[str, Any]] = []
 
+        # Optional experiment sidecars. Runtime interventions live outside this
+        # agent; the agent itself only records step-level signals.
+        self._path_prefix_logs: list[dict[str, Any]] = []
+        self._node_id: str = "0"
+        self._node_depth: int = 0
+        self._node_temperature: float = 0.0
+        self._alarm_events: list[dict[str, Any]] = []
+
     # ------------------------------------------------------------------
     # Core override
     # ------------------------------------------------------------------
@@ -469,6 +477,7 @@ class MonitoringAgent(DefaultAgent):
         data["step_logs"] = self.step_logs
         data["prefix_final"] = self.get_prefix().to_dict() if self.step_logs else None
         data["mc_results"] = self.mc_results
+        data["alarm_events"] = self._alarm_events
         return data
 
     def save_step_logs(self, path: Path) -> None:
