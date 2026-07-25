@@ -27,31 +27,36 @@ pipeline:
 
 | artifact | purpose |
 | --- | --- |
-| [`prefix_alarm_monitor.ipynb`](prefix_alarm_monitor.ipynb) | notebook that trains the prefix score model, calibrates `p_success`, tunes alarm rules, runs the no-confidence ablation, and computes the CUSUM backtracking diagnostic |
-| [`prefix_alarm_monitor_lib.py`](prefix_alarm_monitor_lib.py) | importable copy of the notebook implementation, including `run_experiment(args)` |
+| [`prefix_alarm_monitor.ipynb`](prefix_alarm_monitor.ipynb) | compact benchmark entry point that configures, runs, and displays all monitor comparisons |
+| [`prefix_alarm_monitor_lib.py`](prefix_alarm_monitor_lib.py) | original linear scorer and three baseline rules, including `run_experiment(args)` |
+| [`prefix_alarm_monitor/`](prefix_alarm_monitor/) | Linear/LightGBM/MLP/XGBoost scorer comparison, sequential rules, and the unified benchmark runner |
 | [`MONITOR_TRAINING.md`](MONITOR_TRAINING.md) | detailed explanation of the model, rules, metrics, latest numbers, and how to rerun |
 | [`monitor_results/leaf_low_fp_monitor/`](monitor_results/leaf_low_fp_monitor/) | latest full-feature monitor artifacts (`summary.json`, predictions, feature weights, calibration files) |
 | [`monitor_results/no_confidence_leaf_low_fp_monitor/`](monitor_results/no_confidence_leaf_low_fp_monitor/) | ablation that drops all confidence-derived features |
+| [`monitor_results/algorithm_comparison/`](monitor_results/algorithm_comparison/) | unified 50-row table, thresholds, and full/no-confidence tree/MLP models |
 
 The current default rule is `calibrated_leaf_low_fp`: alarm when calibrated
 `p_success` falls below a validation-tuned threshold chosen to minimize
 successful-path false alarms subject to a target failing-path recall. The
-notebook also reports `cusum_leaf_low_fp`, which lowers false alarms by
-accumulating risk over time, and `gated_leaf_low_fp`, which confirms the
-calibrated alarm with uncertainty/drop signals.
+systematic benchmark compares it with tuned CUSUM, consecutive-$K$, EWMA, and,
+for Linear, `gated_leaf_low_fp`.
 
 Latest full-feature test metrics from `summary.json`:
 
 | rule | failing-path recall | successful-path false alarm | median true alarm step | mean early-warning |
 | --- | ---: | ---: | ---: | ---: |
 | `calibrated_leaf_low_fp` | 84.3% | 18.0% | 40 | 38.5% |
-| `cusum_leaf_low_fp` | 82.1% | 10.4% | 49 | 22.3% |
 | `gated_leaf_low_fp` | 84.1% | 17.3% | 40 | 38.0% |
+| `lightgbm_cusum_tuned_low_fp` | **85.7%** | **6.0%** | 49 | 18.8% |
 
-`CUSUM Alarm Backtracking` in the notebook traces each CUSUM alarm backward
-to the shortest recent contribution window that explains the threshold
-crossing. In the latest run, the all-path median rollback is about 32 real
-steps, or 8 sampled prefixes, on both validation and test.
+The systematic algorithm comparison evaluates both full features and the
+no-confidence ablation for every scorer. Linear uses calibrated, tuned CUSUM,
+gated/LCB, consecutive-$K$, EWMA, leaky CUSUM, and sliding-window risk rules
+(14 rows). LightGBM, the lightweight MLP, and XGBoost use every rule except the
+Linear-specific gated/LCB rule (12 rows each). The original coarse-search CUSUM
+is excluded. `lightgbm_cusum_tuned_low_fp` is the strongest low-false-positive
+result from the earlier 26-row benchmark; rerun the notebook to produce the new
+50-row comparison.
 
 ## Layout
 

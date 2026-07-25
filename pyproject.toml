@@ -19,6 +19,12 @@ dependencies = [
 vllm = [
   "vllm>=0.6.0",
 ]
+alarm-monitor = [
+  "lightgbm>=4.0",
+  "numpy>=1.24",
+  "pandas>=2.0",
+  "xgboost>=2.0",
+]
 
 [project.urls]
 Repository = "https://github.com/Bradley-Zhu/mon-agent"

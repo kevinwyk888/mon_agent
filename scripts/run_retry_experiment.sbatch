@@ -45,6 +45,7 @@ export REPEATS="${REPEATS:-20}"
 export STEP_LIMIT="${STEP_LIMIT:-64}"
 export MAX_TOTAL_STEPS_MULTIPLIER="${MAX_TOTAL_STEPS_MULTIPLIER:-2.5}"
 export ROLLBACK_FALLBACK_STEPS="${ROLLBACK_FALLBACK_STEPS:-8}"
+export ALARM_MIN_STEP="${ALARM_MIN_STEP:-}"
 export RUN_TEMPERATURE="${RUN_TEMPERATURE:-0.3}"
 export RUN_TOP_P="${RUN_TOP_P:-1.0}"
 export SEED_BASE="${SEED_BASE:-1234}"
@@ -88,6 +89,9 @@ runner_args=(
   --sif-cache "${SIF_CACHE}"
   --eval-timeout-s "${EVAL_TIMEOUT_S}"
 )
+if [[ -n "${ALARM_MIN_STEP}" ]]; then
+  runner_args+=(--alarm-min-step "${ALARM_MIN_STEP}")
+fi
 if [[ "${CONDITION}" == "intervention" ]]; then
   runner_args+=(--monitor-dir "${MONITOR_DIR}")
 fi

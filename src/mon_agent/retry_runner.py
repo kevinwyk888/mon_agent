@@ -168,7 +168,7 @@ def _score_cusum_details(
     for idx, row in enumerate(rows):
         step_idx = int(row.step_idx)
         sampled = step_idx >= effective_min and (
-            (step_idx - 1) % monitor.stride == 0 or idx == last
+            (step_idx - 1) % monitor.stride == 0
         )
         if not sampled:
             continue
@@ -629,7 +629,12 @@ def main() -> None:
     parser.add_argument("--max-total-steps-multiplier", type=float, default=2.5)
     parser.add_argument("--snapshot-cwd", default="/testbed")
     parser.add_argument("--rollback-fallback-steps", type=int, default=8)
-    parser.add_argument("--alarm-min-step", type=int, default=0)
+    parser.add_argument(
+        "--alarm-min-step",
+        type=int,
+        default=None,
+        help="Override the monitor artifact's minimum scoring step.",
+    )
     parser.add_argument("--temperature", type=float, default=None)
     parser.add_argument("--top-p", type=float, default=None)
     parser.add_argument("--seed-base", type=int, default=1234)

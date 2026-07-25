@@ -40,6 +40,19 @@ def _load_lib(repo_root: Path):
     return module
 
 
+def _load_xgboost_training(repo_root: Path):
+    alarm_monitor_dir = repo_root / "alarm_monitor"
+    if str(alarm_monitor_dir) not in sys.path:
+        sys.path.insert(0, str(alarm_monitor_dir))
+    from prefix_alarm_monitor.comparison import (
+        BenchmarkConfig,
+        retune_linear_monitor,
+        train_xgboost_monitor,
+    )
+
+    return BenchmarkConfig, retune_linear_monitor, train_xgboost_monitor
+
+
 def _root_y(csv_path: Path) -> float | None:
     with csv_path.open("r", encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
@@ -101,6 +114,12 @@ def main() -> None:
         help="Number of mixed tasks to hold out for the A/B experiment (10-20).",
     )
     parser.add_argument("--seed", type=int, default=7)
+    parser.add_argument(
+        "--scorer",
+        choices=("linear", "xgboost"),
+        default="linear",
+        help="Prefix scorer used by the tuned CUSUM monitor.",
+    )
     parser.add_argument(
         "--selected-ids",
         default="",
@@ -225,21 +244,58 @@ def main() -> None:
         rule_threshold_max_candidates=args.rule_threshold_max_candidates,
         drop_confidence_features=args.drop_confidence_features,
     )
-    print("\nTraining CUSUM monitor with the alarm_monitor pipeline ...")
-    summary = lib.run_experiment(exp_args)
-    cusum = summary["thresholds"].get("cusum_leaf_low_fp", {})
-    print(
-        "Trained. "
-        f"success_threshold={summary['thresholds']['success_probability_threshold']:.3f} "
-        f"cusum_drift={cusum.get('cusum_drift', float('nan')):.4g} "
-        f"cusum_threshold={cusum.get('cusum_threshold', float('nan')):.4g}"
+    print(f"\nTraining {args.scorer} tuned-CUSUM monitor ...")
+    BenchmarkConfig, retune_linear_monitor, train_xgboost_monitor = (
+        _load_xgboost_training(repo_root)
     )
+    benchmark_config = BenchmarkConfig(
+        data_dir=train_dir,
+        output_root=output_dir,
+        window_size=args.window_size,
+        stride=args.stride,
+        min_step=args.min_step,
+        pure_val_ratio=args.pure_val_ratio,
+        seed=args.seed,
+        learning_rate=args.learning_rate,
+        epochs=args.epochs,
+        row_weight=args.row_weight,
+        pairwise_weight=args.pairwise_weight,
+        l2=args.l2,
+        min_pair_gap=args.min_pair_gap,
+        calibration_learning_rate=args.calibration_learning_rate,
+        calibration_epochs=args.calibration_epochs,
+        calibration_l2=args.calibration_l2,
+        confidence_z=args.confidence_z,
+        target_leaf_recall=args.target_leaf_recall,
+        rule_threshold_max_candidates=args.rule_threshold_max_candidates,
+    )
+    if args.scorer == "xgboost":
+        summary = train_xgboost_monitor(
+            benchmark_config,
+            output_dir,
+            drop_confidence_features=args.drop_confidence_features,
+        )
+    else:
+        summary = lib.run_experiment(exp_args)
+        summary = retune_linear_monitor(benchmark_config, output_dir)
+    cusum = summary["thresholds"].get("cusum_leaf_low_fp", {})
+    threshold_parts = [
+        "Trained.",
+        f"cusum_drift={cusum.get('cusum_drift', float('nan')):.4g}",
+        f"cusum_threshold={cusum.get('cusum_threshold', float('nan')):.4g}",
+    ]
+    success_threshold = summary["thresholds"].get("success_probability_threshold")
+    if success_threshold is not None:
+        threshold_parts.insert(1, f"success_threshold={success_threshold:.3f}")
+    print(" ".join(threshold_parts))
 
     filter_regex = "(?:" + "|".join(re.escape(inst) for inst in selected) + ")$"
     dataset_by_instance = _resolve_dataset_membership(selected)
     selection = {
         "data_dir": str(data_dir),
         "monitor_dir": str(output_dir),
+        "scorer": args.scorer,
+        "drop_confidence_features": args.drop_confidence_features,
         "selected_instances": selected,
         "selected_root_y": {inst: id_to_root_y[inst] for inst in selected},
         "seed": args.seed,

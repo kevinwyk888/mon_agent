@@ -1,0 +1,1512 @@
+{
+  "config": {
+    "data_dir": "/home/kevinwyk/mon_agent/alarm_monitor/data",
+    "output_root": "/home/kevinwyk/mon_agent/alarm_monitor/monitor_results",
+    "window_size": 64,
+    "stride": 8,
+    "min_step": 9,
+    "pure_val_ratio": 0.5,
+    "seed": 7,
+    "learning_rate": 0.03,
+    "epochs": 250,
+    "row_weight": 0.2,
+    "pairwise_weight": 1.0,
+    "l2": 0.001,
+    "min_pair_gap": 0.05,
+    "calibration_learning_rate": 0.05,
+    "calibration_epochs": 400,
+    "calibration_l2": 0.001,
+    "confidence_z": 1.96,
+    "target_leaf_recall": 0.85,
+    "rule_threshold_max_candidates": 48,
+    "force_baseline_retrain": false,
+    "force_scorer_retrain": false,
+    "force_rule_retune": false
+  },
+  "scorer_test_prefix_auroc": {
+    "linear_full_features": 0.8904327021677865,
+    "linear_no_confidence": 0.877871911521603,
+    "lightgbm_full_features": 0.8579409102074539,
+    "mlp_full_features": 0.8511006997337779,
+    "xgboost_full_features": 0.8582547559340663,
+    "lightgbm_no_confidence": 0.8575105011670501,
+    "mlp_no_confidence": 0.859932475971017,
+    "xgboost_no_confidence": 0.8556961296876894
+  },
+  "baseline": {
+    "full_features": {
+      "val": {
+        "calibrated_leaf_low_fp": {
+          "pure0_leaf_alarm_recall": 0.8516293043679224,
+          "pure1_leaf_false_alarm_rate": 0.18831168831168832,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 32.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 38.847506372770276
+        },
+        "gated_leaf_low_fp": {
+          "pure0_leaf_alarm_recall": 0.8509359833602959,
+          "pure1_leaf_false_alarm_rate": 0.18344155844155843,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 32.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 38.4061159471556
+        }
+      },
+      "test": {
+        "calibrated_leaf_low_fp": {
+          "pure0_leaf_alarm_recall": 0.8433627330579435,
+          "pure1_leaf_false_alarm_rate": 0.18032786885245902,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 24.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 38.484326029748296
+        },
+        "gated_leaf_low_fp": {
+          "pure0_leaf_alarm_recall": 0.8413531316288936,
+          "pure1_leaf_false_alarm_rate": 0.1725625539257981,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 24.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 38.04896319314128
+        }
+      }
+    },
+    "no_confidence": {
+      "val": {
+        "calibrated_leaf_low_fp": {
+          "pure0_leaf_alarm_recall": 0.8606424774670672,
+          "pure1_leaf_false_alarm_rate": 0.22727272727272727,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 32.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 37.407665170283536
+        },
+        "gated_leaf_low_fp": {
+          "pure0_leaf_alarm_recall": 0.8515137508666513,
+          "pure1_leaf_false_alarm_rate": 0.19805194805194806,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 40.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 36.62233556532004
+        }
+      },
+      "test": {
+        "calibrated_leaf_low_fp": {
+          "pure0_leaf_alarm_recall": 0.8514011387741431,
+          "pure1_leaf_false_alarm_rate": 0.20189818809318377,
+          "pure0_leaf_alarm_median_step": 41.0,
+          "pure1_leaf_false_alarm_median_step": 24.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 36.59211853951904
+        },
+        "gated_leaf_low_fp": {
+          "pure0_leaf_alarm_recall": 0.8438093111532879,
+          "pure1_leaf_false_alarm_rate": 0.19240724762726488,
+          "pure0_leaf_alarm_median_step": 41.0,
+          "pure1_leaf_false_alarm_median_step": 25.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 35.291525365050276
+        }
+      }
+    }
+  },
+  "additional": {
+    "linear_consecutive_k_low_fp": {
+      "parameters": {
+        "fail_threshold": 0.4213248387096774,
+        "consecutive_k": 4.0,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8669979200369771,
+          "pure1_leaf_false_alarm_rate": 0.20616883116883117,
+          "pure0_leaf_alarm_median_step": 41.0,
+          "pure1_leaf_false_alarm_median_step": 33.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 37.24899465766885
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8479401585352239,
+          "pure1_leaf_false_alarm_rate": 0.17083692838654013,
+          "pure0_leaf_alarm_median_step": 41.0,
+          "pure1_leaf_false_alarm_median_step": 32.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 36.0856724163502
+        }
+      }
+    },
+    "linear_ewma_low_fp": {
+      "parameters": {
+        "alpha": 0.7,
+        "fail_threshold": 0.605184681594188,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8542870348971574,
+          "pure1_leaf_false_alarm_rate": 0.18993506493506493,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 32.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 38.65750292084744
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8454839790108295,
+          "pure1_leaf_false_alarm_rate": 0.17169974115616912,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 24.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 39.439846336807655
+        }
+      }
+    },
+    "linear_cusum_tuned_low_fp": {
+      "parameters": {
+        "cusum_drift": 0.0,
+        "cusum_threshold": 4.926327000000001,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8524381788768199,
+          "pure1_leaf_false_alarm_rate": 0.12581168831168832,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 48.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 22.116721849851448
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8173495590041309,
+          "pure1_leaf_false_alarm_rate": 0.10353753235547886,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 41.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 21.90227672732575
+        }
+      }
+    },
+    "linear_leaky_cusum_low_fp": {
+      "parameters": {
+        "decay": 0.99,
+        "cusum_drift": 0.0,
+        "cusum_threshold": 4.639501714797062,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8557892304136815,
+          "pure1_leaf_false_alarm_rate": 0.13474025974025974,
+          "pure0_leaf_alarm_median_step": 48.0,
+          "pure1_leaf_false_alarm_median_step": 48.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 23.107234955724234
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8230434297197723,
+          "pure1_leaf_false_alarm_rate": 0.10353753235547886,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 41.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 22.683495375502286
+        }
+      }
+    },
+    "linear_sliding_window_risk_low_fp": {
+      "parameters": {
+        "window_size": 4.0,
+        "fail_threshold": 0.5497279838709678,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8592558354518142,
+          "pure1_leaf_false_alarm_rate": 0.19805194805194806,
+          "pure0_leaf_alarm_median_step": 41.0,
+          "pure1_leaf_false_alarm_median_step": 33.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 37.80830015950025
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8447024673439768,
+          "pure1_leaf_false_alarm_rate": 0.1734253666954271,
+          "pure0_leaf_alarm_median_step": 41.0,
+          "pure1_leaf_false_alarm_median_step": 25.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 39.52685497954968
+        }
+      }
+    },
+    "linear_no_confidence_consecutive_k_low_fp": {
+      "parameters": {
+        "fail_threshold": 0.5070620322580646,
+        "consecutive_k": 3.0,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8515137508666513,
+          "pure1_leaf_false_alarm_rate": 0.17532467532467533,
+          "pure0_leaf_alarm_median_step": 41.0,
+          "pure1_leaf_false_alarm_median_step": 32.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 33.06495176557192
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8387853075806632,
+          "pure1_leaf_false_alarm_rate": 0.15789473684210525,
+          "pure0_leaf_alarm_median_step": 48.0,
+          "pure1_leaf_false_alarm_median_step": 25.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 31.862888893030004
+        }
+      }
+    },
+    "linear_no_confidence_ewma_low_fp": {
+      "parameters": {
+        "alpha": 0.7,
+        "fail_threshold": 0.5969230240072131,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8627224404899468,
+          "pure1_leaf_false_alarm_rate": 0.22321428571428573,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 33.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 37.63665674050172
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8515127832979792,
+          "pure1_leaf_false_alarm_rate": 0.18809318377911993,
+          "pure0_leaf_alarm_median_step": 41.0,
+          "pure1_leaf_false_alarm_median_step": 24.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 37.51574220963003
+        }
+      }
+    },
+    "linear_no_confidence_cusum_tuned_low_fp": {
+      "parameters": {
+        "cusum_drift": 0.0,
+        "cusum_threshold": 4.974685714285714,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8502426623526693,
+          "pure1_leaf_false_alarm_rate": 0.14123376623376624,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 48.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 20.66916577060623
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8220386290052473,
+          "pure1_leaf_false_alarm_rate": 0.10353753235547886,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 41.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 20.19551307327214
+        }
+      }
+    },
+    "linear_no_confidence_leaky_cusum_low_fp": {
+      "parameters": {
+        "decay": 0.95,
+        "cusum_drift": 0.0,
+        "cusum_threshold": 3.952194068779568,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8544025883984284,
+          "pure1_leaf_false_alarm_rate": 0.1444805194805195,
+          "pure0_leaf_alarm_median_step": 48.0,
+          "pure1_leaf_false_alarm_median_step": 42.5,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 22.82523603716932
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.825946187339511,
+          "pure1_leaf_false_alarm_rate": 0.10612597066436583,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 41.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 22.293449996450565
+        }
+      }
+    },
+    "linear_no_confidence_sliding_window_risk_low_fp": {
+      "parameters": {
+        "window_size": 2.0,
+        "fail_threshold": 0.6002285806451613,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8549803559047839,
+          "pure1_leaf_false_alarm_rate": 0.22402597402597402,
+          "pure0_leaf_alarm_median_step": 41.0,
+          "pure1_leaf_false_alarm_median_step": 33.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 37.75937464474853
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8476052249637155,
+          "pure1_leaf_false_alarm_rate": 0.182916307161346,
+          "pure0_leaf_alarm_median_step": 41.0,
+          "pure1_leaf_false_alarm_median_step": 24.5,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 37.8197444392984
+        }
+      }
+    },
+    "lightgbm_consecutive_k_low_fp": {
+      "parameters": {
+        "fail_threshold": 0.570791873123165,
+        "consecutive_k": 2.0,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8871042292581465,
+          "pure1_leaf_false_alarm_rate": 0.20941558441558442,
+          "pure0_leaf_alarm_median_step": 33.0,
+          "pure1_leaf_false_alarm_median_step": 24.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 48.49377120369811
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8781958244948085,
+          "pure1_leaf_false_alarm_rate": 0.25366695427092323,
+          "pure0_leaf_alarm_median_step": 33.0,
+          "pure1_leaf_false_alarm_median_step": 17.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 44.024153652608035
+        }
+      }
+    },
+    "lightgbm_ewma_low_fp": {
+      "parameters": {
+        "alpha": 0.7,
+        "fail_threshold": 0.5875504932158062,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8709267390801941,
+          "pure1_leaf_false_alarm_rate": 0.14853896103896103,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 25.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 44.85018602766565
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8758512894942503,
+          "pure1_leaf_false_alarm_rate": 0.21570319240724764,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 17.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 41.60969358189858
+        }
+      }
+    },
+    "lightgbm_cusum_tuned_low_fp": {
+      "parameters": {
+        "cusum_drift": 0.0,
+        "cusum_threshold": 6.180912081374747,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8623757799861336,
+          "pure1_leaf_false_alarm_rate": 0.056006493506493504,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 52.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 18.889424342328276
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8566484313944401,
+          "pure1_leaf_false_alarm_rate": 0.059534081104400345,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 56.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 18.78653068955142
+        }
+      }
+    },
+    "lightgbm_leaky_cusum_low_fp": {
+      "parameters": {
+        "decay": 0.99,
+        "cusum_drift": 0.0,
+        "cusum_threshold": 5.789133480110922,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8659579385255374,
+          "pure1_leaf_false_alarm_rate": 0.0633116883116883,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 52.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 19.452196004906725
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8580998102043095,
+          "pure1_leaf_false_alarm_rate": 0.062122519413287315,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 55.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 19.571390719998746
+        }
+      }
+    },
+    "lightgbm_sliding_window_risk_low_fp": {
+      "parameters": {
+        "window_size": 2.0,
+        "fail_threshold": 0.5897183619309236,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8731222556043449,
+          "pure1_leaf_false_alarm_rate": 0.1452922077922078,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 32.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 44.55556526455454
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8738416880652004,
+          "pure1_leaf_false_alarm_rate": 0.21052631578947367,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 17.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 41.41326966984002
+        }
+      }
+    },
+    "mlp_consecutive_k_low_fp": {
+      "parameters": {
+        "fail_threshold": 0.4640164215485554,
+        "consecutive_k": 3.0,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8596024959556274,
+          "pure1_leaf_false_alarm_rate": 0.31737012987012986,
+          "pure0_leaf_alarm_median_step": 24.0,
+          "pure1_leaf_false_alarm_median_step": 17.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 52.990877099087726
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.867143016635034,
+          "pure1_leaf_false_alarm_rate": 0.3157894736842105,
+          "pure0_leaf_alarm_median_step": 25.0,
+          "pure1_leaf_false_alarm_median_step": 17.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 48.64506154012056
+        }
+      }
+    },
+    "mlp_ewma_low_fp": {
+      "parameters": {
+        "alpha": 0.7,
+        "fail_threshold": 0.6143016295193928,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8775132886526462,
+          "pure1_leaf_false_alarm_rate": 0.28814935064935066,
+          "pure0_leaf_alarm_median_step": 17.0,
+          "pure1_leaf_false_alarm_median_step": 16.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 59.86473452217971
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8766328011611031,
+          "pure1_leaf_false_alarm_rate": 0.32269197584124243,
+          "pure0_leaf_alarm_median_step": 25.0,
+          "pure1_leaf_false_alarm_median_step": 16.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 53.50922667547561
+        }
+      }
+    },
+    "mlp_cusum_tuned_low_fp": {
+      "parameters": {
+        "cusum_drift": 0.0,
+        "cusum_threshold": 4.732658398468461,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8651490640166397,
+          "pure1_leaf_false_alarm_rate": 0.16396103896103897,
+          "pure0_leaf_alarm_median_step": 41.0,
+          "pure1_leaf_false_alarm_median_step": 40.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 32.07432046362217
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8572066540136206,
+          "pure1_leaf_false_alarm_rate": 0.15185504745470232,
+          "pure0_leaf_alarm_median_step": 41.0,
+          "pure1_leaf_false_alarm_median_step": 41.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 28.642455752173408
+        }
+      }
+    },
+    "mlp_leaky_cusum_low_fp": {
+      "parameters": {
+        "decay": 0.99,
+        "cusum_drift": 0.0,
+        "cusum_threshold": 4.665226322166595,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8533626068869887,
+          "pure1_leaf_false_alarm_rate": 0.15178571428571427,
+          "pure0_leaf_alarm_median_step": 41.0,
+          "pure1_leaf_false_alarm_median_step": 40.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 31.415825065045844
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.843920955677124,
+          "pure1_leaf_false_alarm_rate": 0.13977566867989646,
+          "pure0_leaf_alarm_median_step": 42.0,
+          "pure1_leaf_false_alarm_median_step": 40.5,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 27.97532301419563
+        }
+      }
+    },
+    "mlp_sliding_window_risk_low_fp": {
+      "parameters": {
+        "window_size": 2.0,
+        "fail_threshold": 0.614475234627419,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8717356135890918,
+          "pure1_leaf_false_alarm_rate": 0.288961038961039,
+          "pure0_leaf_alarm_median_step": 17.0,
+          "pure1_leaf_false_alarm_median_step": 16.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 59.733354764952146
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8662498604443452,
+          "pure1_leaf_false_alarm_rate": 0.3201035375323555,
+          "pure0_leaf_alarm_median_step": 25.0,
+          "pure1_leaf_false_alarm_median_step": 16.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 53.23032185846427
+        }
+      }
+    },
+    "xgboost_consecutive_k_low_fp": {
+      "parameters": {
+        "fail_threshold": 0.5709559321403503,
+        "consecutive_k": 2.0,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8816732146984053,
+          "pure1_leaf_false_alarm_rate": 0.2288961038961039,
+          "pure0_leaf_alarm_median_step": 33.0,
+          "pure1_leaf_false_alarm_median_step": 17.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 49.13260240289886
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8759629340180864,
+          "pure1_leaf_false_alarm_rate": 0.25884383088869717,
+          "pure0_leaf_alarm_median_step": 33.0,
+          "pure1_leaf_false_alarm_median_step": 17.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 44.919384657668814
+        }
+      }
+    },
+    "xgboost_ewma_low_fp": {
+      "parameters": {
+        "alpha": 0.7,
+        "fail_threshold": 0.5865180688202281,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8787843771666282,
+          "pure1_leaf_false_alarm_rate": 0.1444805194805195,
+          "pure0_leaf_alarm_median_step": 33.0,
+          "pure1_leaf_false_alarm_median_step": 24.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 47.70822868914272
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8827732499720888,
+          "pure1_leaf_false_alarm_rate": 0.22433132010353754,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 17.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 44.06204468088698
+        }
+      }
+    },
+    "xgboost_cusum_tuned_low_fp": {
+      "parameters": {
+        "cusum_drift": 0.05,
+        "cusum_threshold": 5.565831866434643,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.861682458978507,
+          "pure1_leaf_false_alarm_rate": 0.060876623376623376,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 51.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 19.397018938350783
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8560902087752595,
+          "pure1_leaf_false_alarm_rate": 0.056082830025884385,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 55.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 19.422326468972678
+        }
+      }
+    },
+    "xgboost_leaky_cusum_low_fp": {
+      "parameters": {
+        "decay": 0.99,
+        "cusum_drift": 0.0,
+        "cusum_threshold": 5.777474759515299,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8653801710191819,
+          "pure1_leaf_false_alarm_rate": 0.06818181818181818,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 51.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 19.611150557920215
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8594395444903428,
+          "pure1_leaf_false_alarm_rate": 0.061259706643658325,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 55.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 19.70319444473451
+        }
+      }
+    },
+    "xgboost_sliding_window_risk_low_fp": {
+      "parameters": {
+        "window_size": 2.0,
+        "fail_threshold": 0.5886834302256184,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8750866651259533,
+          "pure1_leaf_false_alarm_rate": 0.14042207792207792,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 24.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 47.20680243201666
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8794239142570057,
+          "pure1_leaf_false_alarm_rate": 0.2070750647109577,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 17.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 43.78431097914875
+        }
+      }
+    },
+    "lightgbm_no_confidence_consecutive_k_low_fp": {
+      "parameters": {
+        "fail_threshold": 0.5723783806649364,
+        "consecutive_k": 2.0,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8888375317772128,
+          "pure1_leaf_false_alarm_rate": 0.25,
+          "pure0_leaf_alarm_median_step": 33.0,
+          "pure1_leaf_false_alarm_median_step": 24.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 49.1655518647173
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8821033828290722,
+          "pure1_leaf_false_alarm_rate": 0.30629853321829165,
+          "pure0_leaf_alarm_median_step": 33.0,
+          "pure1_leaf_false_alarm_median_step": 17.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 45.296074190814196
+        }
+      }
+    },
+    "lightgbm_no_confidence_ewma_low_fp": {
+      "parameters": {
+        "alpha": 0.7,
+        "fail_threshold": 0.5887200285042746,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8849087127339959,
+          "pure1_leaf_false_alarm_rate": 0.21185064935064934,
+          "pure0_leaf_alarm_median_step": 33.0,
+          "pure1_leaf_false_alarm_median_step": 16.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 48.67508461725113
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8863458747348443,
+          "pure1_leaf_false_alarm_rate": 0.21570319240724764,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 16.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 44.33162464025793
+        }
+      }
+    },
+    "lightgbm_no_confidence_cusum_tuned_low_fp": {
+      "parameters": {
+        "cusum_drift": 0.0,
+        "cusum_threshold": 6.206904123122861,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8621446729835914,
+          "pure1_leaf_false_alarm_rate": 0.05762987012987013,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 52.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 18.684188616761354
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8547504744892263,
+          "pure1_leaf_false_alarm_rate": 0.059534081104400345,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 56.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 18.678012763185897
+        }
+      }
+    },
+    "lightgbm_no_confidence_leaky_cusum_low_fp": {
+      "parameters": {
+        "decay": 0.99,
+        "cusum_drift": 0.0,
+        "cusum_threshold": 5.807817536599428,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8658423850242662,
+          "pure1_leaf_false_alarm_rate": 0.06412337662337662,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 51.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 19.490018321180486
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8568717204421124,
+          "pure1_leaf_false_alarm_rate": 0.061259706643658325,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 55.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 19.51494460404854
+        }
+      }
+    },
+    "lightgbm_no_confidence_sliding_window_risk_low_fp": {
+      "parameters": {
+        "window_size": 2.0,
+        "fail_threshold": 0.5905818200686204,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8800554656806101,
+          "pure1_leaf_false_alarm_rate": 0.200487012987013,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 17.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 47.0262771835811
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8841129842581221,
+          "pure1_leaf_false_alarm_rate": 0.19240724762726488,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 17.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 43.74253524323391
+        }
+      }
+    },
+    "mlp_no_confidence_consecutive_k_low_fp": {
+      "parameters": {
+        "fail_threshold": 0.47078144100019814,
+        "consecutive_k": 3.0,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8604113704645251,
+          "pure1_leaf_false_alarm_rate": 0.23376623376623376,
+          "pure0_leaf_alarm_median_step": 24.0,
+          "pure1_leaf_false_alarm_median_step": 24.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 52.274216935826246
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8712738640169699,
+          "pure1_leaf_false_alarm_rate": 0.27523727351164795,
+          "pure0_leaf_alarm_median_step": 32.0,
+          "pure1_leaf_false_alarm_median_step": 17.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 45.79559177483519
+        }
+      }
+    },
+    "mlp_no_confidence_ewma_low_fp": {
+      "parameters": {
+        "alpha": 0.7,
+        "fail_threshold": 0.6405118838183694,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8606424774670672,
+          "pure1_leaf_false_alarm_rate": 0.22483766233766234,
+          "pure0_leaf_alarm_median_step": 32.0,
+          "pure1_leaf_false_alarm_median_step": 16.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 51.85640054123172
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8647984816344758,
+          "pure1_leaf_false_alarm_rate": 0.19499568593615185,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 16.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 44.93672069398604
+        }
+      }
+    },
+    "mlp_no_confidence_cusum_tuned_low_fp": {
+      "parameters": {
+        "cusum_drift": 0.0,
+        "cusum_threshold": 5.175446533745021,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8539403743933441,
+          "pure1_leaf_false_alarm_rate": 0.11525974025974026,
+          "pure0_leaf_alarm_median_step": 48.0,
+          "pure1_leaf_false_alarm_median_step": 41.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 26.842128603553935
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8450374009154851,
+          "pure1_leaf_false_alarm_rate": 0.09749784296807593,
+          "pure0_leaf_alarm_median_step": 48.0,
+          "pure1_leaf_false_alarm_median_step": 41.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 24.08058300449764
+        }
+      }
+    },
+    "mlp_no_confidence_leaky_cusum_low_fp": {
+      "parameters": {
+        "decay": 0.99,
+        "cusum_drift": 0.009017178432320416,
+        "cusum_threshold": 4.7277369783934535,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8567136584238503,
+          "pure1_leaf_false_alarm_rate": 0.12824675324675325,
+          "pure0_leaf_alarm_median_step": 41.0,
+          "pure1_leaf_false_alarm_median_step": 41.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 28.278972841762
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8498381154404376,
+          "pure1_leaf_false_alarm_rate": 0.10698878343399482,
+          "pure0_leaf_alarm_median_step": 48.0,
+          "pure1_leaf_false_alarm_median_step": 40.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 25.490276592507644
+        }
+      }
+    },
+    "mlp_no_confidence_sliding_window_risk_low_fp": {
+      "parameters": {
+        "window_size": 2.0,
+        "fail_threshold": 0.6388284963903266,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8556736769124105,
+          "pure1_leaf_false_alarm_rate": 0.2215909090909091,
+          "pure0_leaf_alarm_median_step": 32.0,
+          "pure1_leaf_false_alarm_median_step": 16.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 51.090681546836706
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8578765211566373,
+          "pure1_leaf_false_alarm_rate": 0.1906816220880069,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 17.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 45.29643667787212
+        }
+      }
+    },
+    "xgboost_no_confidence_consecutive_k_low_fp": {
+      "parameters": {
+        "fail_threshold": 0.571761853271915,
+        "consecutive_k": 2.0,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8831754102149295,
+          "pure1_leaf_false_alarm_rate": 0.2069805194805195,
+          "pure0_leaf_alarm_median_step": 33.0,
+          "pure1_leaf_false_alarm_median_step": 25.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 47.798351465494065
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8862342302110081,
+          "pure1_leaf_false_alarm_rate": 0.26919758412424505,
+          "pure0_leaf_alarm_median_step": 33.0,
+          "pure1_leaf_false_alarm_median_step": 17.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 45.15978686618683
+        }
+      }
+    },
+    "xgboost_no_confidence_ewma_low_fp": {
+      "parameters": {
+        "alpha": 0.7,
+        "fail_threshold": 0.5874442451852907,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8821354287034897,
+          "pure1_leaf_false_alarm_rate": 0.12824675324675325,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 32.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 42.24040197931242
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8837780506866139,
+          "pure1_leaf_false_alarm_rate": 0.19240724762726488,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 24.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 41.202626594071695
+        }
+      }
+    },
+    "xgboost_no_confidence_cusum_tuned_low_fp": {
+      "parameters": {
+        "cusum_drift": 0.0,
+        "cusum_threshold": 6.243338708366666,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8623757799861336,
+          "pure1_leaf_false_alarm_rate": 0.056006493506493504,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 53.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 18.487242900160137
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.857653232108965,
+          "pure1_leaf_false_alarm_rate": 0.056945642795513375,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 56.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 18.55101481446331
+        }
+      }
+    },
+    "xgboost_no_confidence_leaky_cusum_low_fp": {
+      "parameters": {
+        "decay": 0.99,
+        "cusum_drift": 0.0,
+        "cusum_threshold": 5.842978774526906,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8659579385255374,
+          "pure1_leaf_false_alarm_rate": 0.06412337662337662,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 52.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 19.227723251045628
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.859662833538015,
+          "pure1_leaf_false_alarm_rate": 0.06557377049180328,
+          "pure0_leaf_alarm_median_step": 49.0,
+          "pure1_leaf_false_alarm_median_step": 55.5,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 19.314203458567885
+        }
+      }
+    },
+    "xgboost_no_confidence_sliding_window_risk_low_fp": {
+      "parameters": {
+        "window_size": 2.0,
+        "fail_threshold": 0.5898241698741912,
+        "selection_target_leaf_recall": 0.85
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8791310376704414,
+          "pure1_leaf_false_alarm_rate": 0.1185064935064935,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 32.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 41.21100947184699
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8789773361616613,
+          "pure1_leaf_false_alarm_rate": 0.182916307161346,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 24.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 39.89535707358895
+        }
+      }
+    },
+    "lightgbm_calibrated_leaf_low_fp": {
+      "parameters": {
+        "accuracy": 0.6783789440636283,
+        "balanced_accuracy": 0.8022316807752012,
+        "precision": 0.9925672594619243,
+        "recall": 0.6421512228220787,
+        "specificity": 0.9623121387283237,
+        "f1": 0.7798018879753525,
+        "roc_auc": 0.8499085720580589,
+        "average_precision": 0.9796687734020371,
+        "brier": 0.15052680845203878,
+        "log_loss": 0.4634438009525269,
+        "alarm_rate": 0.573753335775208,
+        "tp": 21767.0,
+        "tn": 4162.0,
+        "fp": 163.0,
+        "fn": 12130.0,
+        "pure0_leaf_alarm_recall": 0.870811185578923,
+        "pure1_leaf_false_alarm_rate": 0.15016233766233766,
+        "pure0_leaf_alarm_median_step": 40.0,
+        "pure1_leaf_false_alarm_median_step": 32.0,
+        "pure0_leaf_paths": 8654.0,
+        "pure1_leaf_paths": 1232.0,
+        "pure0_successful_warning_mean_early_pct": 44.520511034958325,
+        "success_threshold": 0.40508915093930037,
+        "alarm_score_threshold": 0.5949108490606996,
+        "selection_target_leaf_recall": 0.85,
+        "selection_mode": "min_leaf_false_alarm_subject_to_leaf_recall"
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.870811185578923,
+          "pure1_leaf_false_alarm_rate": 0.15016233766233766,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 32.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 44.520511034958325
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8760745785419225,
+          "pure1_leaf_false_alarm_rate": 0.1993097497842968,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 24.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 40.95196155074825
+        }
+      }
+    },
+    "mlp_calibrated_leaf_low_fp": {
+      "parameters": {
+        "accuracy": 0.6732771702161059,
+        "balanced_accuracy": 0.788160263129668,
+        "precision": 0.9875210638976181,
+        "recall": 0.6396731274154055,
+        "specificity": 0.9366473988439307,
+        "f1": 0.7764170874064527,
+        "roc_auc": 0.8595490350655957,
+        "average_precision": 0.9804363024416717,
+        "brier": 0.15740713396411565,
+        "log_loss": 0.46592588758099934,
+        "alarm_rate": 0.5744597352310188,
+        "tp": 21683.0,
+        "tn": 4051.0,
+        "fp": 274.0,
+        "fn": 12214.0,
+        "pure0_leaf_alarm_recall": 0.8661890455280795,
+        "pure1_leaf_false_alarm_rate": 0.25811688311688313,
+        "pure0_leaf_alarm_median_step": 24.0,
+        "pure1_leaf_false_alarm_median_step": 16.0,
+        "pure0_leaf_paths": 8654.0,
+        "pure1_leaf_paths": 1232.0,
+        "pure0_successful_warning_mean_early_pct": 54.48011863416181,
+        "success_threshold": 0.31676723046675886,
+        "alarm_score_threshold": 0.6832327695332412,
+        "selection_target_leaf_recall": 0.85,
+        "selection_mode": "min_leaf_false_alarm_subject_to_leaf_recall"
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8661890455280795,
+          "pure1_leaf_false_alarm_rate": 0.25811688311688313,
+          "pure0_leaf_alarm_median_step": 24.0,
+          "pure1_leaf_false_alarm_median_step": 16.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 54.48011863416181
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.859774478061851,
+          "pure1_leaf_false_alarm_rate": 0.27351164797238997,
+          "pure0_leaf_alarm_median_step": 32.0,
+          "pure1_leaf_false_alarm_median_step": 16.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 49.11843681338055
+        }
+      }
+    },
+    "xgboost_calibrated_leaf_low_fp": {
+      "parameters": {
+        "accuracy": 0.6775155669509706,
+        "balanced_accuracy": 0.7996269282956989,
+        "precision": 0.991613109075163,
+        "recall": 0.6417972091925539,
+        "specificity": 0.957456647398844,
+        "f1": 0.7792463643527473,
+        "roc_auc": 0.8500644199079121,
+        "average_precision": 0.9796250128298791,
+        "brier": 0.1507557181360028,
+        "log_loss": 0.4630845154793912,
+        "alarm_rate": 0.5739888022604782,
+        "tp": 21755.0,
+        "tn": 4141.0,
+        "fp": 184.0,
+        "fn": 12142.0,
+        "pure0_leaf_alarm_recall": 0.8777443956551884,
+        "pure1_leaf_false_alarm_rate": 0.14285714285714285,
+        "pure0_leaf_alarm_median_step": 40.0,
+        "pure1_leaf_false_alarm_median_step": 24.0,
+        "pure0_leaf_paths": 8654.0,
+        "pure1_leaf_paths": 1232.0,
+        "pure0_successful_warning_mean_early_pct": 41.993860791809105,
+        "success_threshold": 0.4067765474319458,
+        "alarm_score_threshold": 0.5932234525680542,
+        "selection_target_leaf_recall": 0.85,
+        "selection_mode": "min_leaf_false_alarm_subject_to_leaf_recall"
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8777443956551884,
+          "pure1_leaf_false_alarm_rate": 0.14285714285714285,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 24.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 41.993860791809105
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.8773026683041197,
+          "pure1_leaf_false_alarm_rate": 0.1915444348576359,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 24.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 40.623631944602124
+        }
+      }
+    },
+    "lightgbm_no_confidence_calibrated_leaf_low_fp": {
+      "parameters": {
+        "accuracy": 0.6785620846632829,
+        "balanced_accuracy": 0.8020323656449213,
+        "precision": 0.992434945084993,
+        "recall": 0.6424462341800159,
+        "specificity": 0.9616184971098266,
+        "f1": 0.7799785100286533,
+        "roc_auc": 0.8487644395696518,
+        "average_precision": 0.979436212587334,
+        "brier": 0.15056308817430736,
+        "log_loss": 0.463388183468755,
+        "alarm_rate": 0.5740934540317095,
+        "tp": 21777.0,
+        "tn": 4159.0,
+        "fp": 166.0,
+        "fn": 12120.0,
+        "pure0_leaf_alarm_recall": 0.8849087127339959,
+        "pure1_leaf_false_alarm_rate": 0.15827922077922077,
+        "pure0_leaf_alarm_median_step": 40.0,
+        "pure1_leaf_false_alarm_median_step": 24.0,
+        "pure0_leaf_paths": 8654.0,
+        "pure1_leaf_paths": 1232.0,
+        "pure0_successful_warning_mean_early_pct": 43.533825966465216,
+        "success_threshold": 0.40648911179283753,
+        "alarm_score_threshold": 0.5935108882071625,
+        "selection_target_leaf_recall": 0.85,
+        "selection_mode": "min_leaf_false_alarm_subject_to_leaf_recall"
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8849087127339959,
+          "pure1_leaf_false_alarm_rate": 0.15827922077922077,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 24.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 43.533825966465216
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.882996539019761,
+          "pure1_leaf_false_alarm_rate": 0.21138912855910266,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 17.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 41.30434062098863
+        }
+      }
+    },
+    "mlp_no_confidence_calibrated_leaf_low_fp": {
+      "parameters": {
+        "accuracy": 0.6554602061639894,
+        "balanced_accuracy": 0.7847716467141789,
+        "precision": 0.9901626939084374,
+        "recall": 0.6176357789774907,
+        "specificity": 0.9519075144508671,
+        "f1": 0.7607419923329881,
+        "roc_auc": 0.8658577011862355,
+        "average_precision": 0.9813712098541624,
+        "brier": 0.15420775432821168,
+        "log_loss": 0.460915279264032,
+        "alarm_rate": 0.5531892627282716,
+        "tp": 20936.0,
+        "tn": 4117.0,
+        "fp": 208.0,
+        "fn": 12961.0,
+        "pure0_leaf_alarm_recall": 0.8608735844696094,
+        "pure1_leaf_false_alarm_rate": 0.21996753246753248,
+        "pure0_leaf_alarm_median_step": 33.0,
+        "pure1_leaf_false_alarm_median_step": 16.0,
+        "pure0_leaf_paths": 8654.0,
+        "pure1_leaf_paths": 1232.0,
+        "pure0_successful_warning_mean_early_pct": 45.37418510931383,
+        "success_threshold": 0.3083744572396476,
+        "alarm_score_threshold": 0.6916255427603524,
+        "selection_target_leaf_recall": 0.85,
+        "selection_mode": "min_leaf_false_alarm_subject_to_leaf_recall"
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8608735844696094,
+          "pure1_leaf_false_alarm_rate": 0.21996753246753248,
+          "pure0_leaf_alarm_median_step": 33.0,
+          "pure1_leaf_false_alarm_median_step": 16.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 45.37418510931383
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.861784079490901,
+          "pure1_leaf_false_alarm_rate": 0.19672131147540983,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 16.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 40.42035246934923
+        }
+      }
+    },
+    "xgboost_no_confidence_calibrated_leaf_low_fp": {
+      "parameters": {
+        "accuracy": 0.6792161582334781,
+        "balanced_accuracy": 0.8031071244219781,
+        "precision": 0.992757584039355,
+        "recall": 0.642977254624303,
+        "specificity": 0.9632369942196531,
+        "f1": 0.7804694633936724,
+        "roc_auc": 0.8475676006589837,
+        "average_precision": 0.9793897502491609,
+        "brier": 0.1493593172796238,
+        "log_loss": 0.46355818307349483,
+        "alarm_rate": 0.5743812464025954,
+        "tp": 21795.0,
+        "tn": 4166.0,
+        "fp": 159.0,
+        "fn": 12102.0,
+        "pure0_leaf_alarm_recall": 0.8775132886526462,
+        "pure1_leaf_false_alarm_rate": 0.14204545454545456,
+        "pure0_leaf_alarm_median_step": 40.0,
+        "pure1_leaf_false_alarm_median_step": 25.0,
+        "pure0_leaf_paths": 8654.0,
+        "pure1_leaf_paths": 1232.0,
+        "pure0_successful_warning_mean_early_pct": 41.32819573917423,
+        "success_threshold": 0.40323883295059204,
+        "alarm_score_threshold": 0.596761167049408,
+        "selection_target_leaf_recall": 0.85,
+        "selection_mode": "min_leaf_false_alarm_subject_to_leaf_recall"
+      },
+      "metrics": {
+        "val": {
+          "pure0_leaf_alarm_recall": 0.8775132886526462,
+          "pure1_leaf_false_alarm_rate": 0.14204545454545456,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 25.0,
+          "pure0_leaf_paths": 8654.0,
+          "pure1_leaf_paths": 1232.0,
+          "pure0_successful_warning_mean_early_pct": 41.32819573917423
+        },
+        "test": {
+          "pure0_leaf_alarm_recall": 0.877637601875628,
+          "pure1_leaf_false_alarm_rate": 0.17687661777394306,
+          "pure0_leaf_alarm_median_step": 40.0,
+          "pure1_leaf_false_alarm_median_step": 24.0,
+          "pure0_leaf_paths": 8957.0,
+          "pure1_leaf_paths": 1159.0,
+          "pure0_successful_warning_mean_early_pct": 37.9957174916213
+        }
+      }
+    }
+  }
+}

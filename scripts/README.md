@@ -83,6 +83,53 @@ python scripts/compare_retry_experiment.py \
   --intervention results/retry_intervention_<jobid>
 ```
 
+### XGBoost tuned CUSUM
+
+Reuse the original held-out tasks when comparing XGBoost with an existing
+linear CUSUM experiment. This retrains XGBoost only on the remaining CSVs and
+tunes CUSUM on pure validation trajectories:
+
+```bash
+SELECTED_IDS=$(
+  python -c 'import json; print(",".join(json.load(open("results/mon_lin/monitor/selection.json"))["selected_instances"]))'
+)
+
+python scripts/prepare_retry_experiment.py \
+  --data-dir alarm_monitor/data \
+  --output-dir results/mon_xgb/monitor \
+  --selected-ids "$SELECTED_IDS" \
+  --scorer xgboost \
+  --window-size 64 \
+  --stride 8 \
+  --min-step 9 \
+  --seed 7
+```
+
+Run one repeat without harness evaluation before submitting the full job:
+
+```bash
+SELECTION=results/mon_xgb/monitor/selection.json \
+CONDITION=intervention \
+MONITOR_DIR=results/mon_xgb/monitor \
+RUN_NAME=smoke_xgboost_cusum \
+REPEATS=1 WORKERS=1 EVALUATE_HARNESS=0 \
+sbatch scripts/run_retry_experiment.sbatch
+```
+
+Then submit the 64-step-path, 160-total-step intervention:
+
+```bash
+SELECTION=results/mon_xgb/monitor/selection.json \
+CONDITION=intervention \
+MONITOR_DIR=results/mon_xgb/monitor \
+RUN_NAME=int_xgb \
+STEP_LIMIT=64 MAX_TOTAL_STEPS_MULTIPLIER=2.5 REPEATS=20 \
+sbatch scripts/run_retry_experiment.sbatch
+```
+
+`ALARM_MIN_STEP` is optional. When it is unset, the runner uses the value saved
+in the monitor artifacts, which is recommended for train/runtime consistency.
+
 ## Recreating your own batch script
 
 If you need a cluster launcher, build a local wrapper around:

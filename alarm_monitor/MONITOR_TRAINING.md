@@ -1,18 +1,19 @@
 # Prefix Alarm Monitor
 
 [`prefix_alarm_monitor.ipynb`](prefix_alarm_monitor.ipynb) is the current
-source of truth for the first offline monitor trained from the tree-search
-CSVs. [`prefix_alarm_monitor_lib.py`](prefix_alarm_monitor_lib.py) mirrors the
-notebook implementation so the same pipeline can be run as
-`tam.run_experiment(args)`.
+benchmark entry point for offline monitors trained from the tree-search CSVs.
+The original linear implementation lives in
+[`prefix_alarm_monitor_lib.py`](prefix_alarm_monitor_lib.py), while alternative
+scorers, sequential rules, and the unified runner live under
+[`prefix_alarm_monitor/`](prefix_alarm_monitor/).
 
 The monitor consumes per-prefix features from `*.steps.csv`, learns a
 calibrated probability of eventual success, and turns low predicted
 solvability into leaf-level alarms.
 
-## What The Notebook Does
+## What The Benchmark Does
 
-The notebook:
+The benchmark runner:
 
 1. reads all `*.steps.csv` files under `DATA_DIR`,
 2. uses only mixed-root files (`0 < root_y < 1`) for training,
@@ -25,12 +26,21 @@ The notebook:
 8. learns a raw prefix score with weighted sibling Bradley-Terry comparisons
    plus a small row-level anchor,
 9. fits a logistic calibrator from raw score to `p_success`,
-10. tunes three leaf-level alarm rules on the validation split,
-11. keeps `calibrated_leaf_low_fp` as the default final rule,
-12. reports leaf-trajectory metrics on validation and test,
-13. runs a no-confidence feature ablation, and
-14. includes a CUSUM backtracking diagnostic that estimates how far before
-    the actual CUSUM alarm the contributing risk window begins.
+10. evaluates both full features and the no-confidence ablation for every scorer,
+11. trains separate full/no-confidence LightGBM, XGBoost, and dependency-light
+  two-layer MLP scorers,
+12. tunes calibrated, consecutive-$K$, EWMA, expanded-search CUSUM, leaky
+  CUSUM, and sliding-window risk rules on validation leaf trajectories,
+13. retains the original gated/LCB rule for Linear only, and
+14. reports the 14-row Linear and 12-row LightGBM, MLP, and XGBoost test tables.
+
+Run all comparisons from `alarm_monitor/` with:
+
+```python
+from prefix_alarm_monitor import default_config, run_benchmark
+
+comparison = run_benchmark(default_config())
+```
 
 ## Data Layout
 
@@ -170,30 +180,26 @@ theta_p = 0.3512
 This remains the default because it gives the best balance between recall and
 early warning.
 
-### `cusum_leaf_low_fp`
+### `lightgbm_cusum_tuned_low_fp`
 
-Sequential CUSUM rule over each leaf path:
-
-```text
-fail_score_i = 1 - p_success_i
-increment_i  = fail_score_i - k
-C_i          = max(0, C_{i-1} + increment_i)
-alarm_i      = 1[C_i >= h]
-```
-
-Both `k` (`cusum_drift`) and `h` (`cusum_threshold`) are tuned on validation
-with the same leaf-level low-false-positive criterion.
-
-Latest full-feature thresholds:
+The same one-sided CUSUM recurrence is applied to the LightGBM failure
+probability. A denser validation-only search over drift and path-level alarm
+thresholds selected:
 
 ```text
-cusum_drift     ~= 6.63e-12
-cusum_threshold ~= 4.8645
+cusum_drift     = 0.0
+cusum_threshold = 6.1809
 ```
 
-In this run the drift is effectively zero, so the rule mostly accumulates
-`1 - p_success` until the cumulative evidence crosses the threshold. This
-cuts false alarms substantially, but alarms later.
+Latest leaf-level results:
+
+| split | failing-path recall | successful-path false alarm | median alarm step | mean early-warning |
+| --- | ---: | ---: | ---: | ---: |
+| validation | 86.2% | 5.6% | 49 | 18.9% |
+| test | 85.7% | 6.0% | 49 | 18.8% |
+
+This is the current strongest offline low-false-positive result. The tradeoff
+is later warning than the calibrated and MLP rules.
 
 ### `gated_leaf_low_fp`
 
@@ -269,54 +275,14 @@ Rule comparison on the test set:
 | rule | leaf TPR | leaf FPR | median true alarm step | mean early-warning |
 | --- | ---: | ---: | ---: | ---: |
 | `calibrated_leaf_low_fp` | 84.3% | 18.0% | 40 | 38.5% |
-| `cusum_leaf_low_fp` | 82.1% | 10.4% | 49 | 22.3% |
 | `gated_leaf_low_fp` | 84.1% | 17.3% | 40 | 38.0% |
 
 Reading:
 
 - `calibrated_leaf_low_fp` is the most balanced default: high recall and
   early warnings, but more false alarms.
-- `cusum_leaf_low_fp` reduces successful-path false alarms from 18.0% to
-  10.4%, a relative reduction of about 43%, but loses about 2.2 points of
-  failing-path recall and alarms around 9 steps later.
 - `gated_leaf_low_fp` is a light filter over the calibrated rule. It slightly
   lowers false alarms while keeping almost the same recall and timing.
-
-## CUSUM Backtracking Diagnostic
-
-The notebook includes a `CUSUM Alarm Backtracking` cell. For each CUSUM-alarmed
-leaf path, it traces backward from the first alarm to the shortest recent
-contribution window whose increments are enough to cross the CUSUM threshold.
-
-For an alarm at sampled position `tau`:
-
-```text
-increment_t = fail_score_t - cusum_drift
-```
-
-The backtracked `risk_start` is the latest start position such that:
-
-```text
-sum_{t=risk_start}^{tau} increment_t >= cusum_threshold
-```
-
-The diagnostic then reports:
-
-```text
-rollback_steps = alarm_step - risk_start_step
-```
-
-Latest all-path output from the notebook:
-
-| split | alarmed leaf paths | mean rollback steps | median rollback steps | mean rollback sampled prefixes | median rollback sampled prefixes | median risk start step | median alarm step |
-| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| val | 7572 | 34.2 | 32 | 8.51 | 8 | 16 | 48 |
-| test | 7478 | 34.6 | 32 | 8.58 | 8 | 16 | 49 |
-
-This is a post-hoc explanation of where the accumulated evidence came from.
-It does not mean the monitor could have fired at the risk-start step online.
-It means the alarm at roughly step 48-49 is mostly explained by the previous
-about 9 sampled prefixes, or about 32-35 real steps.
 
 ## No-Confidence Ablation
 
@@ -407,9 +373,6 @@ Each run writes to `OUTPUT_DIR`:
 | `val_predictions.csv`, `test_predictions.csv` | per-prefix success probability, raw score, LCB, parent score, score drop, and final-rule flags |
 | `feature_weights.csv` | learned standardized weight for every feature |
 | `top_weights.json` | top 20 features by absolute standardized weight |
-
-The CUSUM backtracking table is displayed by the notebook cell and is not
-currently written into `summary.json`.
 
 ## How To Extend
 

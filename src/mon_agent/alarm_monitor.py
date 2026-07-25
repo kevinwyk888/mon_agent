@@ -43,6 +43,29 @@ from typing import Any, Sequence
 import numpy as np
 
 
+class _XGBoostPredictor:
+    def __init__(self, path: Path) -> None:
+        try:
+            import xgboost as xgb
+        except ImportError as exc:
+            raise RuntimeError(
+                "XGBoost monitor artifacts require the alarm-monitor extra"
+            ) from exc
+        self.model = xgb.Booster()
+        self.model.load_model(path)
+
+    def predict_success_prob(self, features: np.ndarray) -> float:
+        best_iteration = getattr(self.model, "best_iteration", None)
+        iteration_range = (
+            (0, best_iteration + 1) if best_iteration is not None else (0, 0)
+        )
+        prediction = self.model.inplace_predict(
+            np.asarray(features, dtype=np.float32)[None, :],
+            iteration_range=iteration_range,
+        )
+        return float(np.clip(prediction[0], 1e-6, 1.0 - 1e-6))
+
+
 # ---------------------------------------------------------------------------
 # Locating and importing the shared alarm-model library
 # ---------------------------------------------------------------------------
@@ -129,6 +152,7 @@ class PrefixAlarmMonitor:
         rule: str = "cusum_leaf_low_fp",
         cusum_drift: float | None = None,
         cusum_threshold: float | None = None,
+        predictor: _XGBoostPredictor | None = None,
     ) -> None:
         self._lib = _load_alarm_lib()
         self._featurizer = self._lib.PrefixFeaturizer()
@@ -172,6 +196,7 @@ class PrefixAlarmMonitor:
         self.cusum_threshold = (
             float(cusum_threshold) if cusum_threshold is not None else None
         )
+        self._predictor = predictor
 
         n = len(self._keep_idx)
         for name, arr in (
@@ -198,6 +223,56 @@ class PrefixAlarmMonitor:
     ) -> "PrefixAlarmMonitor":
         artifacts_dir = Path(artifacts_dir)
         summary = json.loads((artifacts_dir / "summary.json").read_text())
+        model_info = summary.get("model", {})
+        if model_info.get("type") == "xgboost":
+            dropped = set(summary.get("feature_filter", {}).get("dropped_features", []))
+            full_names = list(_load_alarm_lib().PrefixFeaturizer().feature_names)
+            kept_names = [name for name in full_names if name not in dropped]
+            configured_names = model_info.get("feature_names")
+            if configured_names and list(configured_names) != kept_names:
+                raise ValueError(
+                    "XGBoost artifact feature order does not match the current featurizer"
+                )
+            model_path = artifacts_dir / model_info.get("path", "xgboost_model.json")
+            predictor = _XGBoostPredictor(model_path)
+            if predictor.model.num_features() != len(kept_names):
+                raise ValueError(
+                    f"XGBoost model expects {predictor.model.num_features()} features "
+                    f"but the current artifact configuration provides {len(kept_names)}"
+                )
+
+            cfg = summary.get("config", {})
+            thresholds = summary.get("thresholds", {})
+            cusum = thresholds.get("cusum_leaf_low_fp", {}) or {}
+            n_features = len(kept_names)
+            return cls(
+                weights=np.zeros(n_features, dtype=np.float64),
+                bias=0.0,
+                kept_feature_names=kept_names,
+                scaler_mean=np.zeros(n_features, dtype=np.float64),
+                scaler_scale=np.ones(n_features, dtype=np.float64),
+                calib_scale=1.0,
+                calib_bias=0.0,
+                success_threshold=float(
+                    thresholds.get("success_probability_threshold", 0.5)
+                ),
+                window_size=int(cfg.get("window_size", 64)),
+                min_step=int(cfg.get("min_step", 9)),
+                stride=int(cfg.get("stride", 8)),
+                rule=rule,
+                cusum_drift=(
+                    float(cusum["cusum_drift"])
+                    if "cusum_drift" in cusum
+                    else None
+                ),
+                cusum_threshold=(
+                    float(cusum["cusum_threshold"])
+                    if "cusum_threshold" in cusum
+                    else None
+                ),
+                predictor=predictor,
+            )
+
         scaler = json.loads((artifacts_dir / "scaler.json").read_text())
         calibrator = json.loads((artifacts_dir / "calibrator.json").read_text())
 
@@ -229,7 +304,6 @@ class PrefixAlarmMonitor:
 
         cfg = summary.get("config", {})
         thresholds = summary.get("thresholds", {})
-        model_info = summary.get("model", {})
         cusum = thresholds.get("cusum_leaf_low_fp", {}) or {}
 
         return cls(
@@ -324,6 +398,9 @@ class PrefixAlarmMonitor:
         window_rows = rows[max(0, prefix_end - self.window_size) : prefix_end]
         full_vec = self._featurizer.transform_window(window_rows, self.window_size)
         x = full_vec[self._keep_idx]
+        if self._predictor is not None:
+            p_success = self._predictor.predict_success_prob(x)
+            return p_success, p_success
         x_std = (x - self.scaler_mean) / self.scaler_scale
         raw_score = float(np.dot(x_std, self.weights) + self.bias)
         z = self.calib_scale * raw_score + self.calib_bias
@@ -365,11 +442,8 @@ class PrefixAlarmMonitor:
             stat = 0.0
             crossed = False
             for i, r in enumerate(rows):
-                is_last = i == last
                 s = int(r.step_idx)
-                sampled = s >= effective_min and (
-                    (s - 1) % self.stride == 0 or is_last
-                )
+                sampled = s >= effective_min and (s - 1) % self.stride == 0
                 if not sampled:
                     continue
                 _, p_i = self._p_for_prefix(rows, i)
